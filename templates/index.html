@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Your App Title</title>
+</head>
+<body>
+<div id="chatWidgetContainer"
+  data-name="Chatbot"
+  data-server-url="http://127.0.0.1:5000"
+  data-use-feedback
+  data-use-login>
+</div>
+</body>
+<script
+  type="text/javascript"
+  src="https://cdn.jsdelivr.net/npm/iaigroup-chatwidget@latest/build/bundle.min.js"
+></script>
+<script>
+    ChatWidget({
+      name: "Chatbot",
+      serverUrl: "http://127.0.0.1:5000",
+      useFeedback: true,
+      useLogin: true,
+    }, "customContainerId");
+  </script>
+</html>

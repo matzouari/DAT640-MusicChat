@@ -32,3 +32,6 @@ class Playlist():
             return True
         else:
             return False
+        
+    def clear_playlist(self):
+        self.tracks.clear()

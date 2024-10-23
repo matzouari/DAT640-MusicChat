@@ -81,6 +81,12 @@ class MusicAgent(Agent):
                 str(self.pl),
                 participant=DialogueParticipant.AGENT,
             )
+        elif "clear" in utterance.text:
+            self.pl.clear_playlist()
+            response = AnnotatedUtterance(
+                "Playlist cleared. All songs removed",
+                participant=DialogueParticipant.AGENT,
+            )
         else: 
             response = AnnotatedUtterance(
                 "I'm sorry, I didn't understand you. Please try again.",

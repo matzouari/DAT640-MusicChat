@@ -27,11 +27,11 @@ class Playlist():
             return False
         
     def remove_track(self, track):
-        if track in self.tracks:
-            self.tracks.remove(track)
-            return True
-        else:
-            return False
+        for i in self.tracks:
+            if i.name == track.name:
+                self.tracks.remove(i)
+                return True
+        return False
         
     def clear_playlist(self):
         self.tracks.clear()

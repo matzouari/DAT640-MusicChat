@@ -10,6 +10,8 @@ from flask import Flask, Request, request
 from flask_cors import CORS
 from flask_socketio import Namespace, SocketIO
 
+import mysql.connector
+
 from dialoguekit.core import AnnotatedUtterance
 from dialoguekit.platforms.platform import Platform
 
@@ -70,11 +72,11 @@ class musicPlatform(Platform):
         Args:
             agent_class: The class of the agent.
         """
-        super().__init__(agent_class)
         self.app = Flask(__name__)
         CORS(self.app, origins="*", support_credentials=True)
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
-        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:musicpwd@localhost/MusicDB'
+
+        super().__init__(agent_class)
 
     def start(self, host: str = "127.0.0.1", port: str = "5000") -> None:
         """Starts the platform.

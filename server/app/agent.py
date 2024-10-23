@@ -4,26 +4,50 @@ from dialoguekit.core.utterance import Utterance
 from dialoguekit.participant.agent import Agent
 from dialoguekit.participant.participant import DialogueParticipant
 
-from playlist import *
+import mysql.connector
+from playlist import Playlist, Track
 
 class MusicAgent(Agent):
     def __init__(self, id: str):
-        """Parrot agent.
-
-        This agent parrots back what the user utters.
-        To end the conversation the user has to say `EXIT`.
-
-        Args:
-            id: Agent id.
-        """
+        """Initialize MusicBot agent."""
         super().__init__(id)
         self.pl = Playlist(name="My playlist", tracks=[])
-        # self.playlist_list = []
+
+        # Database connection configuration
+        db_config = {
+            'user': 'root',  # or your DB user
+            'password': 'musicpwd',
+            'host': 'localhost',
+            'database': 'MusicDB',
+        }
+        # Establishing the connection
+        def connect_to_db():
+            try:
+                conn = mysql.connector.connect(**db_config)
+                if conn.is_connected():
+                    print('Connected to MySQL database')
+                return conn
+            except mysql.connector.Error as err:
+                print(f"Error: {err}")
+                return None
+        self.db_conn = connect_to_db()
+
+    def fetch_track_from_db(self, track_name):
+        """Fetch track from database."""
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            query = "SELECT id, track_name, artist_name, album_name FROM Tracks WHERE track_name = %s"
+            cursor.execute(query, (track_name,))
+            result = cursor.fetchone()
+            return result
+        except Error as e:
+            print(f"Error fetching track: {e}")
+            return None
 
     def welcome(self) -> None:
         """Sends the agent's welcome message."""
         utterance = AnnotatedUtterance(
-            "Hello, I'm MusicBot. What can I help u with?",
+            "Hello, I'm MusicBot. What can I help you with?",
             participant=DialogueParticipant.AGENT,
         )
         self._dialogue_connector.register_agent_utterance(utterance)
@@ -48,21 +72,29 @@ class MusicAgent(Agent):
         if utterance.text == "EXIT":
             self.goodbye()
             return
-        elif "create" in utterance.text: # If we want to create multiple playlists
-            # self.playlist_list.append(Playlist(name="Playlist " + len(self.playlist_list + 1), tracks=[]))
-            response = AnnotatedUtterance(
-                "Playlist already exists",
-                participant=DialogueParticipant.AGENT,
-            ) 
         elif "add" in utterance.text:
-            if self.pl.add_track(Track(utterance.text[4:])):
-                response = AnnotatedUtterance(
-                    "Adding song to playlist",
-                    participant=DialogueParticipant.AGENT,
+            track_name = utterance.text[4:]
+            track_info = self.fetch_track_from_db(track_name)
+
+            if track_info:
+                track = Track(
+                    name=track_info['track_name'],
+                    artist=track_info['artist_name'],
+                    album=track_info['album_name']
                 )
+                if self.pl.add_track(track):
+                    response = AnnotatedUtterance(
+                        f"Adding {track.name} by {track.artist} to the playlist.",
+                        participant=DialogueParticipant.AGENT,
+                    )
+                else:
+                    response = AnnotatedUtterance(
+                        "Track already exists in playlist",
+                        participant=DialogueParticipant.AGENT,
+                    )
             else:
                 response = AnnotatedUtterance(
-                    "Song already exists in playlist",
+                    "Track not found in the database.",
                     participant=DialogueParticipant.AGENT,
                 )
         elif "remove" in utterance.text or "delete" in utterance.text:
@@ -85,6 +117,11 @@ class MusicAgent(Agent):
             self.pl.clear_playlist()
             response = AnnotatedUtterance(
                 "Playlist cleared. All songs removed",
+                participant=DialogueParticipant.AGENT,
+            )
+        elif "hi" in utterance.text or "hello" in utterance.text:
+            response = AnnotatedUtterance(
+                "Hello, I'm MusicBot. What can I help you with?",
                 participant=DialogueParticipant.AGENT,
             )
         else: 

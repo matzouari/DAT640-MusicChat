@@ -55,7 +55,7 @@ class MusicAgent(Agent):
                 participant=DialogueParticipant.AGENT,
             ) 
         elif "add" in utterance.text:
-            if self.pl.add_track(Track(utterance.text)):
+            if self.pl.add_track(Track(utterance.text[3:])):
                 response = AnnotatedUtterance(
                     "Adding song to playlist",
                     participant=DialogueParticipant.AGENT,

@@ -1,3 +1,6 @@
 __pycache__
 node_modules
 dialogue_export
+.DS_Store
+*.pyc
+database/insert_tracks.sql

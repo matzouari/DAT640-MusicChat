@@ -74,6 +74,7 @@ class musicPlatform(Platform):
         self.app = Flask(__name__)
         CORS(self.app, origins="*", support_credentials=True)
         self.socketio = SocketIO(self.app, cors_allowed_origins="*")
+        self.app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:musicpwd@localhost/MusicDB'
 
     def start(self, host: str = "127.0.0.1", port: str = "5000") -> None:
         """Starts the platform.

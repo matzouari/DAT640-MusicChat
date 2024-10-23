@@ -5,6 +5,7 @@ from dialoguekit.participant.agent import Agent
 from dialoguekit.participant.participant import DialogueParticipant
 
 import mysql.connector
+from mysql.connector import Error
 from playlist import Playlist, Track
 
 class MusicAgent(Agent):

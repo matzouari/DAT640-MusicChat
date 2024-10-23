@@ -18,17 +18,16 @@ src="https://cdn.jsdelivr.net/npm/iaigroup-chatwidget@latest/build/bundle.min.js
         <section id="chat">
             <script>
                 ChatWidget({
-                  name: "Chatbot",
-                  serverUrl: "http://127.0.0.1:5000",
-                  useFeedback: true,
-                  useLogin: true,
+                    name: "MusicBot",
+                    serverUrl: "http://127.0.0.1:5000",
+                    socketioPath: "/socket.io",
+                    transports: ['websocket']  // Enforce WebSocket transport
                 }, "customContainerId");
-              </script>
+            </script>
         </section>
     </main>
     <footer>
         <p>&copy; 2023 Music Chat. All rights reserved.</p>
     </footer>
-    <script src="script.js"></script>
 </body>
 </html>

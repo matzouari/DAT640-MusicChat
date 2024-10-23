@@ -55,7 +55,7 @@ class MusicAgent(Agent):
                 participant=DialogueParticipant.AGENT,
             ) 
         elif "add" in utterance.text:
-            if self.pl.add_track(Track(utterance.text[3:])):
+            if self.pl.add_track(Track(utterance.text[4:])):
                 response = AnnotatedUtterance(
                     "Adding song to playlist",
                     participant=DialogueParticipant.AGENT,
@@ -66,7 +66,7 @@ class MusicAgent(Agent):
                     participant=DialogueParticipant.AGENT,
                 )
         elif "remove" in utterance.text or "delete" in utterance.text:
-            if self.pl.remove_track(Track(utterance.text)):
+            if self.pl.remove_track(Track(utterance.text[7:])):
                 response = AnnotatedUtterance(
                     "Removing song from playlist",
                     participant=DialogueParticipant.AGENT,

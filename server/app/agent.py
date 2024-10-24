@@ -78,6 +78,8 @@ class MusicAgent(Agent):
             response = self.who_wrote_song(user_input)
         elif "show me all songs" in user_input and "album" in user_input: # Show me all songs from album X
             response = self.show_songs_from_album(user_input)
+        elif "how do you work" in user_input:
+            response = self.how_do_you_work()
         else: 
             response = AnnotatedUtterance(
                 "I'm sorry, I didn't understand you. Please try again.",
@@ -245,7 +247,13 @@ class MusicAgent(Agent):
             )
         return response
     
-    
+    def how_do_you_work(self):
+        """How do you work?"""
+        response = AnnotatedUtterance(
+            "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like.",
+            participant=DialogueParticipant.AGENT,
+        )
+        return response
     ########################
     ### DATABASE PROMPTS ###
     ########################

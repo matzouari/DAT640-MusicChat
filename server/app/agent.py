@@ -65,25 +65,79 @@ class MusicAgent(Agent):
             self.goodbye()
             return
         elif "add" in user_input:
-            track_name = user_input[4:]
-            track_info = self.fetch_track_from_db(track_name)
+            # Split the input to see if the artist is mentioned
+            if "by" in user_input:
+                parts = user_input.split("by")
+                track_name = parts[0][4:].strip()  # The part after "add"
+                specified_artist = parts[1].strip().lower()
+            else:
+                track_name = user_input[4:].strip()
+                specified_artist = None  # No artist specified initially
 
-            if track_info:
-                track = Track(
-                    name=track_info['track_name'],
-                    artist=track_info['artist_name'],
-                    album=track_info['album_name']
-                )
-                if self.pl.add_track(track):
+            tracks = self.fetch_tracks_from_db(track_name)
+
+            if tracks:
+                # If multiple tracks are found and no artist was specified in the input
+                if len(tracks) > 1 and not specified_artist:
+                    # Collect the unique artist names for this track
+                    possible_artists = {track['artist_name'] for track in tracks}
+
+                    # Construct a message listing the artists
+                    artist_list = ", ".join(possible_artists)
                     response = AnnotatedUtterance(
-                        f"Adding {track.name} by {track.artist} to the playlist.",
+                        f"There are multiple tracks named '{track_name}'. Possible artists: {artist_list}. Please specify the artist.",
                         participant=DialogueParticipant.AGENT,
                     )
                 else:
-                    response = AnnotatedUtterance(
-                        "Track already exists in playlist",
-                        participant=DialogueParticipant.AGENT,
-                    )
+                    # If artist is provided or only one track matches, filter or use the correct track
+                    if specified_artist:
+                        # Filter by specified artist; check if the specified artist matches any in the semicolon-separated list
+                        matching_tracks = []
+                        for track in tracks:
+                            track_artists = [artist.strip().lower() for artist in track['artist_name'].split(';')]
+                            if specified_artist in track_artists:
+                                matching_tracks.append(track)
+
+                        if matching_tracks:  # Proceed if there's a matching track
+                            track_info = matching_tracks[0]  # First match (or modify to let the user choose)
+                            track = Track(
+                                name=track_info['track_name'],
+                                artist=track_info['artist_name'],
+                                album=track_info['album_name']
+                            )
+                            if self.pl.add_track(track):
+                                response = AnnotatedUtterance(
+                                    f"Adding {track.name} by {track.artist} to the playlist.",
+                                    participant=DialogueParticipant.AGENT,
+                                )
+                            else:
+                                response = AnnotatedUtterance(
+                                    "Track already exists in playlist",
+                                    participant=DialogueParticipant.AGENT,
+                                )
+                        else:
+                            response = AnnotatedUtterance(
+                                f"No track found named '{track_name}' with artist '{specified_artist}'.",
+                                participant=DialogueParticipant.AGENT,
+                            )
+                    else:
+                        # If no artist was specified and there's only one match
+                        track_info = tracks[0]
+                        track = Track(
+                            name=track_info['track_name'],
+                            artist=track_info['artist_name'],
+                            album=track_info['album_name']
+                        )
+                        if self.pl.add_track(track):
+                            response = AnnotatedUtterance(
+                                f"Adding {track.name} by {track.artist} to the playlist.",
+                                participant=DialogueParticipant.AGENT,
+                            )
+                        else:
+                            response = AnnotatedUtterance(
+                                "Track already exists in playlist",
+                                participant=DialogueParticipant.AGENT,
+                            )
             else:
                 response = AnnotatedUtterance(
                     "Track not found in the database.",
@@ -153,24 +207,21 @@ class MusicAgent(Agent):
             )
         self._dialogue_connector.register_agent_utterance(response)
 
-    def fetch_track_from_db(self, track_name):
-        """Fetch track from database, ignoring featured artists."""
+    def fetch_tracks_from_db(self, track_name):
+        """Fetch tracks from the database by track name, handling multiple results."""
         try:
             cursor = self.db_conn.cursor(dictionary=True)
-            # Modify the track_name to handle songs with "(feat. Y)" in their title
-            # Use LIKE to match the main part of the song title, ignoring featured artists
             query = """
             SELECT id, track_name, artist_name, album_name 
             FROM Tracks 
             WHERE track_name LIKE %s
             """
-            # The '%' is a wildcard to match anything after the provided track name
             search_pattern = track_name.strip() + '%'
             cursor.execute(query, (search_pattern,))
-            result = cursor.fetchone()
+            result = cursor.fetchall()
             return result
         except Error as e:
-            print(f"Error fetching track: {e}")
+            print(f"Error fetching tracks: {e}")
             return None
 
     def count_songs_in_album(self, album_name):

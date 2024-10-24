@@ -107,12 +107,12 @@ class MusicAgent(Agent):
             # If multiple tracks are found and no artist was specified in the input
             if len(tracks) > 1 and not specified_artist:
                 # Collect the unique artist names for this track
-                possible_artists = {track['artist_name'] for track in tracks}
+                possible_tracks = {track['track_name'] + " by " + track['artist_name'] for track in tracks}
 
                 # Construct a message listing the artists
-                artist_list = ", ".join(possible_artists)
+                track_list = ", ".join(possible_tracks)
                 response = AnnotatedUtterance(
-                    f"There are multiple tracks named '{track_name}'. Possible artists: {artist_list}. Please specify the artist.",
+                    f"There are multiple tracks named '{track_name}'. Possible artists: {track_list}. Please specify the artist.",
                     participant=DialogueParticipant.AGENT,
                 )
             else:

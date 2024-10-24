@@ -111,14 +111,14 @@ class MusicAgent(Agent):
                 str(self.pl),
                 participant=DialogueParticipant.AGENT,
             )
-        elif "how many songs" in user_input and "album" in user_input:
+        elif "how many songs" in user_input and "album" in user_input: # How many songs are in album X
             album_name = user_input.split("album")[1].strip()
             song_count = self.count_songs_in_album(album_name)
             response = AnnotatedUtterance(
                 f"The album '{album_name}' contains {song_count} song(s).",
                 participant=DialogueParticipant.AGENT,
             )
-        elif "who wrote" in user_input or "which artist" in user_input:
+        elif "who wrote" in user_input or "which artist" in user_input: # Who wrote song X, Which artist wrote song X
             track_name = user_input.split("song")[1].strip()
             artist = self.get_artist_of_song(track_name)
             if artist:
@@ -131,7 +131,7 @@ class MusicAgent(Agent):
                     f"I couldn't find the artist for the song '{track_name}'.",
                     participant=DialogueParticipant.AGENT,
                 )
-        elif "show me all songs" in user_input and "album" in user_input:
+        elif "show me all songs" in user_input and "album" in user_input: # Show me all songs from album X
             album_name = user_input.split("album")[1].strip()
             songs = self.get_songs_from_album(album_name)
             

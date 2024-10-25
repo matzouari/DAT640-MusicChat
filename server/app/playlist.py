@@ -26,9 +26,9 @@ class Playlist():
         else:
             return False
         
-    def remove_track(self, track):
+    def remove_track(self, track_name, artist_name = None):
         for i in self.tracks:
-            if i.name == track.name:
+            if i.name.lower() == track_name.lower() and (artist_name is None or i.artist.lower() == artist_name.lower()):
                 self.tracks.remove(i)
                 return True
         return False

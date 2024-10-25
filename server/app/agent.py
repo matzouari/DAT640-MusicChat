@@ -74,11 +74,15 @@ class MusicAgent(Agent):
             response = self.view_playlist()
         elif "how many songs" in user_input and "album" in user_input: # How many songs are in album X
             response = self.number_of_songs_in_album(user_input)
+        elif "how many songs" in user_input and "by" in user_input: # How many songs are written by X
+            response = self.number_of_songs_by_artist(user_input)
         elif "who wrote" in user_input or "which artist" in user_input: # Who wrote song X, Which artist wrote song X
             response = self.who_wrote_song(user_input)
         elif "show me all songs" in user_input and "album" in user_input: # Show me all songs from album X
             response = self.show_songs_from_album(user_input)
-        elif "how do you work" in user_input:
+        elif "show me all songs" in user_input and "by" in user_input: # Show me all songs by X
+            response = self.show_songs_by_artist(user_input)
+        elif "how do you work" in user_input or "what do you do" in user_input:
             response = self.how_do_you_work()
         else: 
             response = AnnotatedUtterance(
@@ -91,7 +95,7 @@ class MusicAgent(Agent):
     ### CHATBOT RESPONSES ###
     #########################
 
-    def add_songs(self, user_input):
+    def add_songs(self, user_input): # Use Naturally for song name for testing.
         # Split the input to see if the artist is mentioned
         if "by" in user_input:
             parts = user_input.split("by")
@@ -112,7 +116,7 @@ class MusicAgent(Agent):
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
                 response = AnnotatedUtterance(
-                    f"There are multiple tracks named '{track_name}'. Possible artists: {track_list}. Please specify the artist.",
+                    f"There are multiple tracks containing '{track_name}'. Possible artists: {track_list}. Please specify the artist.",
                     participant=DialogueParticipant.AGENT,
                 )
             else:
@@ -213,6 +217,16 @@ class MusicAgent(Agent):
         )
         return response
     
+    def number_of_songs_by_artist(self, user_input):
+        """Get the number of songs in an album."""
+        artist_name = user_input.split("by")[1].strip()
+        song_count = self.count_songs_by_artist(artist_name)
+        response = AnnotatedUtterance(
+            f"The artist '{artist_name}' has written {song_count} song(s).",
+            participant=DialogueParticipant.AGENT,
+        )
+        return response
+    
     def who_wrote_song(self, user_input):
         """Get the artist of a song."""
         track_name = user_input.split("song")[1].strip()
@@ -243,6 +257,24 @@ class MusicAgent(Agent):
         else:
             response = AnnotatedUtterance(
                 f"I couldn't find any songs from the album '{album_name}'.",
+                participant=DialogueParticipant.AGENT,
+            )
+        return response
+    
+    def show_songs_by_artist(self, user_input):
+        """Show all songs by an artist."""
+        artist_name = user_input.split("by")[1].strip()
+        songs = self.get_songs_by_artist(artist_name)
+        
+        if songs:
+            song_list = ', '.join([f"{song['track_name']} by {song['artist_name']}" for song in songs])
+            response = AnnotatedUtterance(
+                f"Here are the songs by the artist '{artist_name}': {song_list}.",
+                participant=DialogueParticipant.AGENT,
+            )
+        else:
+            response = AnnotatedUtterance(
+                f"I couldn't find any songs by the artist '{artist_name}'.",
                 participant=DialogueParticipant.AGENT,
             )
         return response
@@ -286,6 +318,18 @@ class MusicAgent(Agent):
         except Error as e:
             print(f"Error counting songs: {e}")
             return 0
+        
+    def count_songs_by_artist(self, artist_name):
+        """Count how many songs are in the specified album."""
+        try:
+            cursor = self.db_conn.cursor()
+            query = "SELECT COUNT(*) FROM Tracks WHERE artist_name LIKE %s"
+            cursor.execute(query, (artist_name,))
+            result = cursor.fetchone()
+            return result[0] if result else 0
+        except Error as e:
+            print(f"Error counting songs: {e}")
+            return 0
     
     def get_artist_of_song(self, track_name):
         """Find the artist of the specified song, ignoring featured artists."""
@@ -308,6 +352,18 @@ class MusicAgent(Agent):
             cursor = self.db_conn.cursor(dictionary=True)
             query = "SELECT track_name, artist_name FROM Tracks WHERE album_name = %s"
             cursor.execute(query, (album_name,))
+            result = cursor.fetchall()
+            return result if result else []
+        except Error as e:
+            print(f"Error fetching songs: {e}")
+            return []
+        
+    def get_songs_by_artist(self, artist_name):
+        """Fetch all songs by the specified artist."""
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            query = "SELECT track_name, artist_name FROM Tracks WHERE artist_name LIKE %s"
+            cursor.execute(query, (artist_name,))
             result = cursor.fetchall()
             return result if result else []
         except Error as e:

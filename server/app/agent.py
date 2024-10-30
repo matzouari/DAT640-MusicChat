@@ -9,6 +9,7 @@ from mysql.connector import Error
 from playlist import Playlist, Track
 
 from random import choice
+import re
 
 class MusicAgent(Agent):
     def __init__(self, id: str):
@@ -117,12 +118,15 @@ class MusicAgent(Agent):
             # If multiple tracks are found and no artist was specified in the input
             if len(tracks) > 1 and not specified_artist:
                 # Collect the unique artist names for this track
-                possible_tracks = {track['track_name'] + " by " + track['artist_name'] for track in tracks}
+                possible_tracks = [
+                    f"{track['track_name']} by {track['artist_name']}"
+                    for track in sorted(tracks, key=lambda x: x['popularity'], reverse=True)
+                ]
 
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
                 response = AnnotatedUtterance(
-                    f"There are multiple tracks containing '{track_name}'. Possible artists: {track_list}. Please specify the artist.",
+                    f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist.",
                     participant=DialogueParticipant.AGENT,
                 )
             else:
@@ -304,12 +308,15 @@ class MusicAgent(Agent):
             # If multiple tracks are found and no artist was specified in the input
             if len(tracks) > 1 and not specified_artist:
                 # Collect the unique artist names for this track
-                possible_tracks = {track['track_name'] + " by " + track['artist_name'] for track in tracks}
+                possible_tracks = [
+                    f"{track['track_name']} by {track['artist_name']}"
+                    for track in sorted(tracks, key=lambda x: x['popularity'], reverse=True)
+                ]
 
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
                 response = AnnotatedUtterance(
-                    f"There are multiple tracks containing '{track_name}'. Possible artists: {track_list}. Please specify the artist.",
+                    f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist.",
                     participant=DialogueParticipant.AGENT,
                 )
             else:
@@ -380,12 +387,15 @@ class MusicAgent(Agent):
             # If multiple tracks are found and no artist was specified in the input
             if len(tracks) > 1 and not specified_artist:
                 # Collect the unique artist names for this track
-                possible_tracks = {track['track_name'] + " by " + track['artist_name'] for track in tracks}
+                possible_tracks = [
+                    f"{track['track_name']} by {track['artist_name']}"
+                    for track in sorted(tracks, key=lambda x: x['popularity'], reverse=True)
+                ]
 
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
                 response = AnnotatedUtterance(
-                    f"There are multiple tracks containing '{track_name}'. Possible artists: {track_list}. Please specify the artist.",
+                    f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist.",
                     participant=DialogueParticipant.AGENT,
                 )
             else:
@@ -482,21 +492,29 @@ class MusicAgent(Agent):
     ########################
 
     def fetch_tracks_from_db(self, track_name):
-        """Fetch tracks from the database by track name, handling multiple results."""
+        """Fetch up to 10 tracks from the database ordered by popularity, 
+        accounting for possible mispunctuation in the track name."""
         try:
             cursor = self.db_conn.cursor(dictionary=True)
+            
+            # Create a search pattern by removing common punctuation and matching variants
+            sanitized_track_name = re.sub(r"[^\w\s]", "", track_name)
+            search_pattern = f"%{sanitized_track_name}%"
+            
             query = """
-            SELECT id, track_name, artist_name, album_name 
+            SELECT id, track_name, artist_name, album_name, popularity
             FROM Tracks 
-            WHERE track_name LIKE %s
+            WHERE REPLACE(track_name, "'", '') LIKE %s
+            ORDER BY popularity DESC
+            LIMIT 10
             """
-            search_pattern = track_name.strip() + '%'
+            
             cursor.execute(query, (search_pattern,))
-            result = cursor.fetchall()
-            return result
+            results = cursor.fetchall()
+            return results
         except Error as e:
             print(f"Error fetching tracks: {e}")
-            return None
+            return []
 
     def count_songs_in_album(self, album_name):
         """Count how many songs are in the specified album."""
@@ -578,3 +596,4 @@ class MusicAgent(Agent):
 # Punctuation
 # Limit the number of songs shown, order by popularity
 # Frontend show the playlist
+

@@ -31,8 +31,28 @@ phrase,intent
 "I need this song in my playlist",add
 "Add track to the list",add
 "Put this song in my list",add
-"Please include track Y",add
-phrase,intent
+"Please include track Y",Add
+"Add this track to my playlist",add
+"Put song X in my playlist",add
+"Please add this song to my collection",add
+"I'd love this song in my playlist",add
+"Could you add track Y?",add
+"Add this one to my list of songs",add
+"Can you include this track in my playlist?",add
+"Please add track Z",add
+"I need this song added",add
+"Please include this one",add
+"Add this track to the playlist",add
+"Can you add this one to my playlist?",add
+"I'd like this song included",add
+"Add this track to my library",add
+"Put song Z on my playlist",add
+"Can you add it to my list?",add
+"Add this song to my collection please",add
+"I want this track in my playlist",add
+"Add this song to my song list",add
+"Put this in my playlist",add
+"Add song X to my collection",add
 "Add",add
 "Put",add
 "Add this song to my playlist",add
@@ -66,6 +86,27 @@ phrase,intent
 "Add track to the list",add
 "Put this song in my list",add
 "Please include track Y",add
+"Add this track to my playlist",add
+"Put song X in my playlist",add
+"Please add this song to my collection",add
+"I'd love this song in my playlist",add
+"Could you add track Y?",add
+"Add this one to my list of songs",add
+"Can you include this track in my playlist?",add
+"Please add track Z",add
+"I need this song added",add
+"Please include this one",add
+"Add this track to the playlist",add
+"Can you add this one to my playlist?",add
+"I'd like this song included",add
+"Add this track to my library",add
+"Put song Z on my playlist",add
+"Can you add it to my list?",add
+"Add this song to my collection please",add
+"I want this track in my playlist",add
+"Add this song to my song list",add
+"Put this in my playlist",add
+"Add song X to my collection",add
 "Remove",remove
 "Delete",remove
 "Remove song from my playlist",remove
@@ -97,6 +138,27 @@ phrase,intent
 "Remove song X from playlist",remove
 "Please remove this",remove
 "I'd like to remove track X",remove
+"Take song X out of my playlist",remove
+"Please remove track Z from the list",remove
+"Get rid of song Y",remove
+"I want to delete track Z",remove
+"Can you remove track X?",remove
+"Please take out this song",remove
+"Delete track X from the playlist",remove
+"I no longer want this song in my playlist",remove
+"Please remove that song",remove
+"Remove track Z from the list",remove
+"Take song Y off my playlist",remove
+"Delete track Y",remove
+"Can you remove this song for me?",remove
+"I want track X gone",remove
+"Please remove song Z",remove
+"Get rid of this track from my list",remove
+"Take this track out of the playlist",remove
+"Remove song X",remove
+"I want this song out",remove
+"Can you delete track Y from my playlist?",remove
+"Delete this one from my collection",remove
 "Remove",remove
 "Delete",remove
 "Remove song from my playlist",remove
@@ -128,6 +190,27 @@ phrase,intent
 "Remove song X from playlist",remove
 "Please remove this",remove
 "I'd like to remove track X",remove
+"Take song X out of my playlist",remove
+"Please remove track Z from the list",remove
+"Get rid of song Y",remove
+"I want to delete track Z",remove
+"Can you remove track X?",remove
+"Please take out this song",remove
+"Delete track X from the playlist",remove
+"I no longer want this song in my playlist",remove
+"Please remove that song",remove
+"Remove track Z from the list",remove
+"Take song Y off my playlist",remove
+"Delete track Y",remove
+"Can you remove this song for me?",remove
+"I want track X gone",remove
+"Please remove song Z",remove
+"Get rid of this track from my list",remove
+"Take this track out of the playlist",remove
+"Remove song X",remove
+"I want this song out",remove
+"Can you delete track Y from my playlist?",remove
+"Delete this one from my collection",remove
 "See",view
 "Show",view
 "Display",view
@@ -194,6 +277,48 @@ phrase,intent
 "I want to look at my playlist",view
 "Let me see all the songs",view
 "Show my playlist please",view
+"Show me the playlist",view
+"Can you display my songs?",view
+"Please show all the songs in my playlist",view
+"Can you open my song list?",view
+"View all the songs I have",view
+"Display my song collection",view
+"I want to see all tracks",view
+"Show me all the tracks",view
+"Please display my playlist",view
+"Can you show my collection?",view
+"Show me the tracks I have in my playlist",view
+"I'd like to see the list of songs",view
+"View the songs in my playlist",view
+"Could you show my playlist for me?",view
+"Can you display my collection of songs?",view
+"Show me the songs",view
+"I want to see my songs",view
+"Show me my list of songs",view
+"View my playlist",view
+"Please show me my playlist",view
+"Can you show my list of tracks?",view
+"Show me the playlist",view
+"Can you display my songs?",view
+"Please show all the songs in my playlist",view
+"Can you open my song list?",view
+"View all the songs I have",view
+"Display my song collection",view
+"I want to see all tracks",view
+"Show me all the tracks",view
+"Please display my playlist",view
+"Can you show my collection?",view
+"Show me the tracks I have in my playlist",view
+"I'd like to see the list of songs",view
+"View the songs in my playlist",view
+"Could you show my playlist for me?",view
+"Can you display my collection of songs?",view
+"Show me the songs",view
+"I want to see my songs",view
+"Show me my list of songs",view
+"View my playlist",view
+"Please show me my playlist",view
+"Can you show my list of tracks?",view
 "Clear",clear
 "Clear my playlist",clear
 "I want to clear the playlist",clear
@@ -258,6 +383,48 @@ phrase,intent
 "Please clear all songs",clear
 "Clear my song collection",clear
 "Remove all songs",clear
+"Clear my entire playlist",clear
+"Empty my playlist completely",clear
+"Delete everything from my playlist",clear
+"Can you clear all songs?",clear
+"I want to remove everything",clear
+"Delete every song in my playlist",clear
+"Empty my collection of songs",clear
+"Please clear all tracks",clear
+"Clear my song list",clear
+"Remove every track from my playlist",clear
+"I need my playlist empty",clear
+"Can you clear my song collection?",clear
+"Delete all the songs",clear
+"Clear out everything",clear
+"Take everything out of my playlist",clear
+"Can you clear my list of tracks?",clear
+"Remove all the songs from the playlist",clear
+"I want to erase my playlist",clear
+"Delete all content from my playlist",clear
+"Can you clear everything?",clear
+"Clear out my playlist",clear
+"Clear my entire playlist",clear
+"Empty my playlist completely",clear
+"Delete everything from my playlist",clear
+"Can you clear all songs?",clear
+"I want to remove everything",clear
+"Delete every song in my playlist",clear
+"Empty my collection of songs",clear
+"Please clear all tracks",clear
+"Clear my song list",clear
+"Remove every track from my playlist",clear
+"I need my playlist empty",clear
+"Can you clear my song collection?",clear
+"Delete all the songs",clear
+"Clear out everything",clear
+"Take everything out of my playlist",clear
+"Can you clear my list of tracks?",clear
+"Remove all the songs from the playlist",clear
+"I want to erase my playlist",clear
+"Delete all content from my playlist",clear
+"Can you clear everything?",clear
+"Clear out my playlist",clear
 "Hello",greeting
 "Hi",greeting
 "Hey",greeting
@@ -278,6 +445,26 @@ phrase,intent
 "Afternoon",greeting
 "Evening",greeting
 "Long time no see",greeting
+"What's up?",greeting
+"Hey there!",greeting
+"Hi, how's it going?",greeting
+"Hello there!",greeting
+"Good to see you!",greeting
+"Hi everyone!",greeting
+"Hey, how are you?",greeting
+"Yo, what's good?",greeting
+"How are you doing?",greeting
+"What's going on?",greeting
+"Hi there, how's everything?",greeting
+"Howdy, partner!",greeting
+"Hey, how's life?",greeting
+"Hi, what's up?",greeting
+"Hello, how's your day?",greeting
+"What's new?",greeting
+"Hey, how's your day going?",greeting
+"Hello, it's great to see you!",greeting
+"Hi, what's happening?",greeting
+"Hi there, how have you been?",greeting
 "Goodbye",exit
 "Bye",exit
 "See you later",exit
@@ -299,3 +486,23 @@ phrase,intent
 "Have a good one",exit
 "So long",exit
 "Exit",exit
+"I'm heading out, bye",exit
+"Catch you later",exit
+"See ya",exit
+"Goodbye for now",exit
+"Time to go, take care",exit
+"Take care, see you",exit
+"Goodbye, it was nice talking",exit
+"See you soon, have a good day",exit
+"Later, take it easy",exit
+"Alright, I'm out",exit
+"Bye now",exit
+"Have a great one, see you later",exit
+"Take care, see you next time",exit
+"Until we meet again",exit
+"Goodbye, talk soon",exit
+"Exit, see you later",exit
+"Okay, I'm off now",exit
+"Until next time, goodbye",exit
+"Take care, peace out",exit
+"Alright, have a great day",exit

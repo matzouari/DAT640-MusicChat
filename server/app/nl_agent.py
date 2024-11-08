@@ -4,6 +4,8 @@ from dialoguekit.core.utterance import Utterance
 from dialoguekit.participant.agent import Agent
 from dialoguekit.participant.participant import DialogueParticipant
 
+from fuzzywuzzy import fuzz
+
 import mysql.connector
 from mysql.connector import Error
 
@@ -110,25 +112,27 @@ class MusicAgent(Agent):
             print(f"Error fetching track from database: {e}")
             return None
 
-    def extract_song_name(self, user_input):
-        """Extract potential song names from user input using n-grams."""
-        # Preprocess the input: lowercasing and removing punctuation
-        processed_input = re.sub(r"[^\w\s]", "", user_input.lower())
+    def extract_song_name(self, sentence):
+        """Extract the most likely song name from the sentence."""
+        # Step 1: Fetch all song titles from the database
+        all_songs = self.fetch_tracks_from_db()  # Assuming this returns a list of track names
         
-        # Split into words
-        words = processed_input.split()
+        # Step 2: Calculate similarity scores for each song title
+        best_match = None
+        highest_score = 0
+        for song in all_songs:
+            # Calculate the similarity score between input sentence and each song title
+            score = fuzz.ratio(sentence.lower(), song.lower())
+            if score > highest_score:
+                highest_score = score
+                best_match = song
         
-        # Generate n-grams (1 to 3 words) to check for possible song names
-        for n in range(1, 4):  # Unigrams, bigrams, and trigrams
-            for gram in ngrams(words, n):
-                possible_name = " ".join(gram)
-                
-                # Check if this possible name matches a known song title in the database
-                if self.is_song_in_database(possible_name):
-                    return possible_name
-
-        # Fallback if no match is found
-        return None
+        # Step 3: Return the best match if it meets a reasonable threshold
+        # A threshold (e.g., 60) ensures it only returns if a match is reasonably close
+        if highest_score > 60:  
+            return best_match
+        else:
+            return None  # No sufficiently close match found
 
     def is_song_in_database(self, song_name):
         """Helper function to check if a song title exists in the database."""

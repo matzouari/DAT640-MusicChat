@@ -10,30 +10,40 @@ from mysql.connector import Error
 from random import choice
 import re
 
+import joblib
+from nltk import ngrams
+
 class MusicAgent(Agent):
     def __init__(self, id: str):
-        """Initialize MusicBot agent."""
+        """Initialize the MusicBot agent with natural language model and DB connection."""
         super().__init__(id)
-
+        
+        # Load the trained natural language model for intent classification
+        self.natural_model = joblib.load('app/model/intent_classifier_model.pkl')
+        self.vectorizer = joblib.load('app/model/vectorizer.pkl')
+        
         # Database connection configuration
         db_config = {
-            'user': 'root',  # or your DB user
-            'password': 'musicpwd',
-            'host': 'localhost',
-            'database': 'MusicDB',
+            'user': 'root',      # Use your actual DB user
+            'password': 'musicpwd',   # Use your actual DB password
+            'host': 'localhost',      # Host configuration
+            'database': 'MusicDB',    # Database name
         }
-        # Establishing the connection
-        def connect_to_db():
-            try:
-                conn = mysql.connector.connect(**db_config)
-                if conn.is_connected():
-                    print('Connected to MySQL database')
-                return conn
-            except mysql.connector.Error as err:
-                print(f"Error: {err}")
-                return None
-        self.db_conn = connect_to_db()
 
+        # Establishing the connection
+        self.db_conn = self.connect_to_db(db_config)
+
+    def connect_to_db(self, db_config):
+        """Connect to MySQL database."""
+        try:
+            conn = mysql.connector.connect(**db_config)
+            if conn.is_connected():
+                print('Connected to MySQL database')
+            return conn
+        except Error as err:
+            print(f"Database connection error: {err}")
+            return None
+        
     def welcome(self) -> None:
         """Sends the agent's welcome message."""
         utterance = AnnotatedUtterance(
@@ -51,50 +61,87 @@ class MusicAgent(Agent):
         )
         self._dialogue_connector.register_agent_utterance(utterance)
 
+    def interpret_input(self, user_input):
+        """Use the SVM model to interpret the intent from user input."""
+        processed_input = self.preprocess_input(user_input)
+        vectorized_input = self.vectorizer.transform([processed_input])  # Vectorize the input
+        
+        # Make the prediction
+        prediction = self.natural_model.predict(vectorized_input)
+        return prediction
+
+    def preprocess_input(self, text):
+        """Preprocess user input (e.g., lowercasing, removing punctuation)."""
+        return text.lower()
+
     def receive_utterance(self, utterance: Utterance) -> None:
-        """Gets called each time there is a new user utterance.
+        """Handle incoming user input based on predicted intent."""
+        user_input = utterance.text
+        intent = self.interpret_input(user_input)
 
-        If the received message is "EXIT" it will close the conversation.
-
-        Args:
-            utterance: User utterance.
-        """
-        # Convert the input text to lowercase
-        user_input = utterance.text.lower()
-
+        # Dispatch to the appropriate method based on intent
         if user_input == "EXIT":
             self.goodbye()
-            return
-        elif "add" in user_input: # Add song X, add song X by artist Y
+        if intent == "add":
             response = self.add_songs(user_input)
-        elif "remove" in user_input or "delete" in user_input: 
-            response = self.remove_songs(user_input)
-        elif "clear" in user_input:
-            response = self.clear_playlist()
-        elif "view" in user_input or "see" in user_input:
+        elif intent == "remove":
+            response = self.remove_song(user_input)
+        elif intent == "view":
             response = self.view_playlist()
-        elif "how many songs" in user_input and "album" in user_input: # How many songs are in album X
-            response = self.number_of_songs_in_album(user_input)
-        elif "how many songs" in user_input and "by" in user_input: # How many songs are written by X
-            response = self.number_of_songs_by_artist(user_input)
-        elif "who wrote" in user_input or "which artist" in user_input: # Who wrote song X, Which artist wrote song X
-            response = self.who_wrote_song(user_input)
-        elif "in which album" in user_input: # In which album is song X
-            response = self.in_which_album(user_input)
-        elif "tell me about" in user_input or "what is" in user_input: # Tell me about song X, What is song X, tell me about the song X by artist Y
-            response = self.tell_me_about_song(user_input)
-        elif "show me all songs" in user_input and "album" in user_input: # Show me all songs from album X
-            response = self.show_songs_from_album(user_input)
-        elif "show me all songs" in user_input and "by" in user_input: # Show me all songs by X
-            response = self.show_songs_by_artist(user_input)
-        elif "how do you work" in user_input or "what do you do" in user_input or "help" in user_input:
-            response = self.how_do_you_work()
-        else: 
+        elif intent == "clear":
+            response = self.clear_playlist()
+        else:
             response = AnnotatedUtterance(
                 "I'm sorry, I didn't understand you. Please try again.",
                 participant=DialogueParticipant.AGENT,
             )
         self._dialogue_connector.register_agent_utterance(response)
+
+    def fetch_track_from_db(self, song_name):
+        """Fetch track details from the database based on the song name."""
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            query = "SELECT * FROM Tracks WHERE track_name = %s"
+            cursor.execute(query, (song_name,))
+            result = cursor.fetchone()
+            cursor.close()
+            return result
+        except Error as e:
+            print(f"Error fetching track from database: {e}")
+            return None
+
+    def extract_song_name(self, user_input):
+        """Extract potential song names from user input using n-grams."""
+        # Preprocess the input: lowercasing and removing punctuation
+        processed_input = re.sub(r"[^\w\s]", "", user_input.lower())
+        
+        # Split into words
+        words = processed_input.split()
+        
+        # Generate n-grams (1 to 3 words) to check for possible song names
+        for n in range(1, 4):  # Unigrams, bigrams, and trigrams
+            for gram in ngrams(words, n):
+                possible_name = " ".join(gram)
+                
+                # Check if this possible name matches a known song title in the database
+                if self.is_song_in_database(possible_name):
+                    return possible_name
+
+        # Fallback if no match is found
+        return None
+
+    def is_song_in_database(self, song_name):
+        """Helper function to check if a song title exists in the database."""
+        try:
+            cursor = self.db_conn.cursor()
+            query = "SELECT COUNT(*) FROM Tracks WHERE LOWER(track_name) = %s"
+            cursor.execute(query, (song_name.lower(),))
+            result = cursor.fetchone()
+            cursor.close()
+            return result[0] > 0
+        except Error as e:
+            print(f"Database error: {e}")
+            return False
 
     #########################
     ### CHATBOT RESPONSES ###
@@ -102,15 +149,9 @@ class MusicAgent(Agent):
 
     def add_songs(self, user_input): # Use Naturally for song name for testing.
         # Split the input to see if the artist is mentioned
-        if "by" in user_input:
-            parts = user_input.split("by")
-            track_name = parts[0][4:].strip()  # The part after "add"
-            specified_artist = parts[1].strip().lower()
-        else:
-            track_name = user_input[4:].strip()
-            specified_artist = None  # No artist specified initially
-
-        tracks = self.fetch_tracks_from_db(track_name)
+        song_name = self.extract_song_name(user_input)
+        tracks = self.fetch_tracks_from_db(song_name)
+        specified_artist = None
 
         if tracks:
             # If multiple tracks are found and no artist was specified in the input
@@ -124,7 +165,7 @@ class MusicAgent(Agent):
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
                 response = AnnotatedUtterance(
-                    f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist.",
+                    f"There are multiple tracks containing '{song_name}'. Possible tracks: {track_list}. Please specify the artist.",
                     participant=DialogueParticipant.AGENT,
                 )
             else:
@@ -163,7 +204,7 @@ class MusicAgent(Agent):
                             )
                     else:
                         response = AnnotatedUtterance(
-                            f"No track found named '{track_name}' with artist '{specified_artist}'.",
+                            f"No track found named '{song_name}' with artist '{specified_artist}'.",
                             participant=DialogueParticipant.AGENT,
                         )
                 else:
@@ -200,22 +241,17 @@ class MusicAgent(Agent):
 
     def remove_songs(self, user_input):
         """Remove songs from the playlist."""
-        if "by" in user_input:
-            parts = user_input.split("by")
-            track_name = parts[0][7:].strip()  # The part after "remove"
-            specified_artist = parts[1].strip().lower()
-        else:
-            track_name = user_input[7:].strip()
-            specified_artist = None
+        song_name = self.extract_song_name(user_input)
+        specified_artist = None
 
-        if self.remove_track_from_playlist_by_name(track_name, specified_artist):
+        if self.remove_track_from_playlist_by_name(song_name, specified_artist):
             response = AnnotatedUtterance(
-                f"Removed {track_name} from the playlist.",
+                f"Removed {song_name} from the playlist.",
                 participant=DialogueParticipant.AGENT,
             )
         else:
             response = AnnotatedUtterance(
-                f"Song {track_name} not found in playlist",
+                f"Song {song_name} not found in playlist",
                 participant=DialogueParticipant.AGENT,
             )
         return response
@@ -636,5 +672,6 @@ class MusicAgent(Agent):
             return []
         
 ## TODO ## 
+# Change the playlist to be fully handled by the database
 # Frontend show the playlist
 

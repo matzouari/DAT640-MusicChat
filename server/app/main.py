@@ -1,7 +1,7 @@
 import mysql.connector
 
 from customPlatform import musicPlatform
-from agent import MusicAgent
+from nl_agent import MusicAgent
 
 # Database connection configuration
 db_config = {

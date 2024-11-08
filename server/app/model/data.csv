@@ -1,0 +1,130 @@
+phrase,intent
+"Add",add
+"Put",add
+"Add this song to my playlist",add
+"I want to add this song",add
+"please include this track",add
+"Can you add song X to my playlist?",add
+"Add that to my list of songs",add
+"Add song Y to my playlist",add
+"I want to add track Z to my playlist",add
+"Put this song in my playlist",add
+"Add track X please",add
+"Could you add this?",add
+"Include song X in my list",add
+"Put this track in my list",add
+"I'd like this song in my playlist",add
+"Can you put this in my playlist?",add
+"I want to add this track to my collection",add
+"Can you add this song to my playlist?",add
+"Add this track to my songs",add
+"I need to add this song",add
+"Please put this in my playlist",add
+"Add song to the playlist",add
+"I want song X in my list",add
+"Add the song to my playlist",add
+"I would like to add this",add
+"Can you add track X to my list?",add
+"Add this track to my collection",add
+"Include this in my list",add
+"Add this one to my playlist",add
+"I need this song in my playlist",add
+"Add track to the list",add
+"Put this song in my list",add
+"Please include track Y",add
+"Remove",remove
+"Delete",remove
+"Remove song from my playlist",remove
+"I want to delete the song",remove
+"Please remove track Y",remove
+"Can you delete that from my playlist?",remove
+"Get rid of this song in my playlist",remove
+"I'd like to delete this song",remove
+"Remove track Z from the playlist",remove
+"Delete this track from my list",remove
+"Can you remove this song?",remove
+"Take this song out of my playlist",remove
+"Take off song X from my playlist",remove
+"I don't want this song in my playlist",remove
+"Remove song from list",remove
+"Can you remove song Y?",remove
+"I want this track gone",remove
+"Delete song X from my playlist",remove
+"I want to remove this track",remove
+"Please delete this song",remove
+"Remove track Y",remove
+"Can you take this off?",remove
+"I want to get rid of this track",remove
+"Delete this from my list",remove
+"Delete that song from the playlist",remove
+"I would like to delete this track",remove
+"Remove that track from my playlist",remove
+"Take out this song",remove
+"Remove song X from playlist",remove
+"Please remove this",remove
+"I'd like to remove track X",remove
+"See",view
+"Show",view
+"Display",view
+"View",view
+"Show me my playlist",view
+"I'd like to see my playlist",view
+"Can you display my playlist?",view
+"I want to view the playlist",view
+"Show all the songs in my playlist",view
+"Can you show my list of songs?",view
+"I want to see all tracks in my playlist",view
+"Show me the songs in my playlist",view
+"Display my list of songs",view
+"Can you view my playlist?",view
+"I'd like to view my collection",view
+"Show all tracks in my playlist",view
+"Please display my playlist",view
+"I want to view my songs",view
+"Could you show my playlist?",view
+"Display all songs in my playlist",view
+"I want to see the list of songs",view
+"Show the playlist",view
+"Show all tracks in my list",view
+"I want to view the list",view
+"Let me see my playlist",view
+"Can you open my playlist?",view
+"Display songs in my playlist",view
+"I need to view my playlist",view
+"Can you show my collection?",view
+"Show all songs in playlist",view
+"I want to look at my playlist",view
+"Let me see all the songs",view
+"Show my playlist please",view
+"Clear",clear
+"Clear my playlist",clear
+"I want to clear the playlist",clear
+"Empty out my playlist",clear
+"Can you clear everything from my playlist?",clear
+"Delete all songs in the playlist",clear
+"Remove all tracks from my playlist",clear
+"Clear out the list",clear
+"Can you remove all songs?",clear
+"Clear everything in my playlist",clear
+"I want to empty my playlist",clear
+"Delete all tracks from my playlist",clear
+"Clear out my collection",clear
+"I need to clear my playlist",clear
+"Clear my list of songs",clear
+"Take all songs out of my playlist",clear
+"Please clear my playlist",clear
+"Delete all songs",clear
+"Can you empty my playlist?",clear
+"Clear all tracks in my playlist",clear
+"Empty my playlist",clear
+"I want everything gone in my playlist",clear
+"Clear the playlist for me",clear
+"Take out everything",clear
+"Delete all songs in my list",clear
+"Can you empty the list?",clear
+"Clear everything in my list",clear
+"Clear the whole playlist",clear
+"Clear everything out",clear
+"Please clear all songs",clear
+"Clear my song collection",clear
+"Remove all songs",clear

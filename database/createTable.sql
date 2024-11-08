@@ -24,14 +24,5 @@ CREATE TABLE Tracks (
 
 CREATE TABLE Playlist (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(80) NOT NULL UNIQUE,
-    creator VARCHAR(30) NOT NULL
-);
-
-CREATE TABLE TracksPlaylist (
-    idTrack VARCHAR(255),
-    idPlaylist INT,
-    PRIMARY KEY (idTrack, idPlaylist),
-    FOREIGN KEY (idTrack) REFERENCES Tracks(id),
-    FOREIGN KEY (idPlaylist) REFERENCES Playlist(id)
+    trackID VARCHAR(255)
 );

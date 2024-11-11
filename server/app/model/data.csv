@@ -506,3 +506,55 @@ phrase,intent
 "Until next time, goodbye",exit
 "Take care, peace out",exit
 "Alright, have a great day",exit
+"Can you recommend some songs?",recommend
+"Suggest some songs based on my playlist",recommend
+"What are some songs I might like?",recommend
+"Give me song recommendations",recommend
+"Can you suggest songs like the ones I have?",recommend
+"Play some similar songs",recommend
+"Recommend songs like the ones in my playlist",recommend
+"I want to hear some similar songs",recommend
+"Suggest music similar to my current songs",recommend
+"Give me more songs like what I’m listening to",recommend
+"Can you recommend something like this?",recommend
+"Any songs you think I’d enjoy?",recommend
+"Find me songs like the ones in my playlist",recommend
+"Show me some song suggestions",recommend
+"What are some songs similar to this?",recommend
+"Suggest something with a similar vibe",recommend
+"I’d like to listen to more songs like these",recommend
+"Give me songs that match my playlist’s mood",recommend
+"Can you suggest songs I might like based on my list?",recommend
+"Recommend me music similar to what I have",recommend
+sentence,intent
+"What can you do?",functionality
+"Tell me what you can help me with.",functionality
+"What’s your purpose?",functionality
+"How can you assist me?",functionality
+"What services do you provide?",functionality
+"What can you help me with?",functionality
+"Describe your functions.",functionality
+"What are your capabilities?",functionality
+"Explain your purpose.",functionality
+"Tell me about your features.",functionality
+"Can you tell me what you do?",functionality
+"What’s your role?",functionality
+"What tasks can you perform?",functionality
+"What are you here to do?",functionality
+"What’s your functionality?",functionality
+"How do you work?",functionality
+"What are your abilities?",functionality
+"What kind of help do you offer?",functionality
+"Why are you here?",functionality
+"Explain what you’re capable of.",functionality
+"How can you be of use?",functionality
+"Tell me your functions.",functionality
+"Describe your purpose.",functionality
+"What’s your role here?",functionality
+"Can you tell me about your skills?",functionality
+"How can you be helpful?",functionality
+"Explain what you do.",functionality
+"What are you designed to do?",functionality
+"What assistance do you offer?",functionality
+"Let me know your purpose.",functionality
+

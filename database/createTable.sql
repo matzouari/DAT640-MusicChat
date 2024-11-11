@@ -1,4 +1,3 @@
-DROP TABLE IF EXISTS TracksPlaylist;
 DROP TABLE IF EXISTS Tracks;
 DROP TABLE IF EXISTS Playlist;
 

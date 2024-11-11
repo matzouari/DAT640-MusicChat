@@ -4,7 +4,8 @@ from dialoguekit.core.utterance import Utterance
 from dialoguekit.participant.agent import Agent
 from dialoguekit.participant.participant import DialogueParticipant
 
-from fuzzywuzzy import fuzz
+from rapidfuzz import fuzz
+from nltk import ngrams
 
 import mysql.connector
 from mysql.connector import Error
@@ -13,7 +14,7 @@ from random import choice
 import re
 
 import joblib
-from nltk import ngrams
+
 
 class MusicAgent(Agent):
     def __init__(self, id: str):
@@ -63,35 +64,24 @@ class MusicAgent(Agent):
         )
         self._dialogue_connector.register_agent_utterance(utterance)
 
-    def interpret_input(self, user_input):
-        """Use the SVM model to interpret the intent from user input."""
-        processed_input = self.preprocess_input(user_input)
-        vectorized_input = self.vectorizer.transform([processed_input])  # Vectorize the input
-        
-        # Make the prediction
-        prediction = self.natural_model.predict(vectorized_input)
-        return prediction
-
-    def preprocess_input(self, text):
-        """Preprocess user input (e.g., lowercasing, removing punctuation)."""
-        return text.lower()
-
     def receive_utterance(self, utterance: Utterance) -> None:
         """Handle incoming user input based on predicted intent."""
         user_input = utterance.text
         intent = self.interpret_input(user_input)
 
         # Dispatch to the appropriate method based on intent
-        if user_input == "EXIT":
-            self.goodbye()
         if intent == "add":
             response = self.add_songs(user_input)
         elif intent == "remove":
-            response = self.remove_song(user_input)
+            response = self.remove_songs(user_input)
         elif intent == "view":
             response = self.view_playlist()
         elif intent == "clear":
             response = self.clear_playlist()
+        elif intent == "greeting":
+            response = self.welcome()
+        elif intent == "exit":
+            response = self.goodbye()
         else:
             response = AnnotatedUtterance(
                 "I'm sorry, I didn't understand you. Please try again.",
@@ -99,7 +89,7 @@ class MusicAgent(Agent):
             )
         self._dialogue_connector.register_agent_utterance(response)
 
-    def fetch_track_from_db(self, song_name):
+    def fetch_track_from_db(self, song_name): # why u here
         """Fetch track details from the database based on the song name."""
         try:
             cursor = self.db_conn.cursor(dictionary=True)
@@ -111,28 +101,84 @@ class MusicAgent(Agent):
         except Error as e:
             print(f"Error fetching track from database: {e}")
             return None
+        
+    #####################
+    ### MODEL METHODS ###
+    #####################
+
+    def preprocess_input(self, text):
+        """Preprocess user input (e.g., lowercasing, removing punctuation)."""
+        return text.lower()
+
+    def interpret_input(self, user_input):
+        """Use the SVM model to interpret the intent from user input."""
+        processed_input = self.preprocess_input(user_input)
+        vectorized_input = self.vectorizer.transform([processed_input])  # Vectorize the input
+        
+        # Make the prediction
+        prediction = self.natural_model.predict(vectorized_input)
+        return prediction
 
     def extract_song_name(self, sentence):
-        """Extract the most likely song name from the sentence."""
-        # Step 1: Fetch all song titles from the database
-        all_songs = self.fetch_tracks_from_db()  # Assuming this returns a list of track names
+        """Extract the most likely song name from the sentence, using consecutive word matches."""
+        # Fetch all song titles from the database
+        all_songs = self.fetch_all_tracks_from_db()
         
-        # Step 2: Calculate similarity scores for each song title
-        best_match = None
-        highest_score = 0
+        # Preprocess input by removing the first word (e.g., "add", "play", etc.) and lowercasing
+        split_sentence = sentence.split(' ')
+        new_sentence = ' '.join(split_sentence[1:]).lower()
+
+        # Generate 2-3 word n-grams from the user's input for consecutive matching
+        ngram_matches = []
+        for n in range(1, 4):  # Generate bigrams and trigrams
+            ngram_matches.extend([' '.join(gram) for gram in ngrams(new_sentence.split(), n)])
+        
+        # Initialize variables for tracking the best match
+        best_song_match = None
+        highest_song_score = 0
+        best_artist_match = None
+        highest_artist_score = 0
+
+        # Compare each n-gram to song titles in the database
         for song in all_songs:
-            # Calculate the similarity score between input sentence and each song title
-            score = fuzz.ratio(sentence.lower(), song.lower())
-            if score > highest_score:
-                highest_score = score
-                best_match = song
-        
-        # Step 3: Return the best match if it meets a reasonable threshold
-        # A threshold (e.g., 60) ensures it only returns if a match is reasonably close
-        if highest_score > 60:  
-            return best_match
+            song_title = song["track_name"].lower()
+            title_word_count = len(song_title.split())
+
+            artist_name = song["artist_name"].lower()
+            for ngram in ngram_matches:
+                # Score each n-gram against the song title
+                score = fuzz.token_sort_ratio(ngram, song_title)
+
+                # Apply weighting based on word count in the title
+                if title_word_count == 1:
+                    weighted_score = score * 0.8  # Penalize single-word titles
+                elif 2 <= title_word_count <= 3:
+                    weighted_score = score * 1.2  # Boost for 2-3 word titles
+                else:
+                    weighted_score = score / (1 + (title_word_count - 3) * 0.1)  # Penalize longer titles
+
+                # Update best match if this weighted score is the highest
+                if weighted_score > highest_song_score:
+                    highest_song_score = weighted_score
+                    best_song_match = song_title
+
+                # Score each n-gram against the artist name
+                artist_score = fuzz.token_sort_ratio(ngram, artist_name)
+
+                # Update best artist match if this score is the highest
+                if artist_score > highest_artist_score:
+                    highest_artist_score = artist_score
+                    best_artist_match = artist_name
+    
+
+        # Return the best match if it meets a reasonable threshold
+        if highest_song_score > 60:
+            if highest_artist_score > 80:
+                return best_song_match, best_artist_match
+            return best_song_match, None
         else:
-            return None  # No sufficiently close match found
+            return None, None  # No sufficiently close match found
+
 
     def is_song_in_database(self, song_name):
         """Helper function to check if a song title exists in the database."""
@@ -151,11 +197,10 @@ class MusicAgent(Agent):
     ### CHATBOT RESPONSES ###
     #########################
 
-    def add_songs(self, user_input): # Use Naturally for song name for testing.
+    def add_songs(self, user_input):
         # Split the input to see if the artist is mentioned
-        song_name = self.extract_song_name(user_input)
-        tracks = self.fetch_tracks_from_db(song_name)
-        specified_artist = None
+        song_name, specified_artist = self.extract_song_name(user_input)
+        tracks = self.fetch_tracks_from_db_by_track_name(song_name)
 
         if tracks:
             # If multiple tracks are found and no artist was specified in the input
@@ -245,8 +290,7 @@ class MusicAgent(Agent):
 
     def remove_songs(self, user_input):
         """Remove songs from the playlist."""
-        song_name = self.extract_song_name(user_input)
-        specified_artist = None
+        song_name, specified_artist = self.extract_song_name(user_input)
 
         if self.remove_track_from_playlist_by_name(song_name, specified_artist):
             response = AnnotatedUtterance(
@@ -342,7 +386,7 @@ class MusicAgent(Agent):
             )
             return response
 
-        tracks = self.fetch_tracks_from_db(track_name)
+        tracks = self.fetch_tracks_from_db_by_track_name(track_name)
 
         if tracks:
             # If multiple tracks are found and no artist was specified in the input
@@ -411,7 +455,7 @@ class MusicAgent(Agent):
             )
             return response
 
-        tracks = self.fetch_tracks_from_db(track_name)
+        tracks = self.fetch_tracks_from_db_by_track_name(track_name)
 
         if tracks:
             # If multiple tracks are found and no artist was specified in the input
@@ -587,7 +631,19 @@ class MusicAgent(Agent):
 
     ### DATABASE PROMPTS ###
 
-    def fetch_tracks_from_db(self, track_name):
+    def fetch_all_tracks_from_db(self):
+        """Fetch all tracks from the database."""
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            query = "SELECT id, track_name, artist_name, album_name FROM Tracks"
+            cursor.execute(query)
+            result = cursor.fetchall()
+            return result if result else []
+        except Error as e:
+            print(f"Error fetching all tracks: {e}")
+            return []
+
+    def fetch_tracks_from_db_by_track_name(self, track_name):
         """Fetch up to 10 tracks from the database ordered by popularity, 
         accounting for possible mispunctuation in the track name."""
         try:

@@ -13,6 +13,8 @@ from mysql.connector import Error
 from random import choice
 import re
 
+from collections import Counter
+
 import joblib
 
 
@@ -72,22 +74,45 @@ class MusicAgent(Agent):
         # Dispatch to the appropriate method based on intent
         if intent == "add":
             response = self.add_songs(user_input)
-        elif intent == "remove":
-            response = self.remove_songs(user_input)
-        elif intent == "view":
-            response = self.view_playlist()
-        elif intent == "clear":
-            response = self.clear_playlist()
-        elif intent == "greeting":
-            response = self.welcome()
-        elif intent == "exit":
-            response = self.goodbye()
-        else:
-            response = AnnotatedUtterance(
-                "I'm sorry, I didn't understand you. Please try again.",
+            utterance = AnnotatedUtterance(
+                response,
                 participant=DialogueParticipant.AGENT,
             )
-        self._dialogue_connector.register_agent_utterance(response)
+        elif intent == "remove":
+            response = self.remove_songs(user_input)
+            utterance = AnnotatedUtterance(
+                response,
+                participant=DialogueParticipant.AGENT,
+            )
+        elif intent == "view":
+            response = self.view_playlist()
+            utterance = AnnotatedUtterance(
+                response,
+                participant=DialogueParticipant.AGENT,
+            )
+        elif intent == "clear":
+            response = self.clear_playlist()
+            utterance = AnnotatedUtterance(
+                response,
+                participant=DialogueParticipant.AGENT,
+            )
+        elif intent == "recommend":
+            response = self.recommend_songs()
+            utterance = AnnotatedUtterance(
+                response,
+                participant=DialogueParticipant.AGENT,
+            )
+        elif intent == "greeting":
+            utterance = self.welcome()
+        elif intent == "exit":
+            utterance = self.goodbye()
+        else:
+            response = "I'm sorry, I didn't understand you. Please try again."
+            utterance = AnnotatedUtterance(
+                response,
+                participant=DialogueParticipant.AGENT,
+            )
+        self._dialogue_connector.register_agent_utterance(utterance)
 
     def fetch_track_from_db(self, song_name): # why u here
         """Fetch track details from the database based on the song name."""
@@ -178,20 +203,71 @@ class MusicAgent(Agent):
             return best_song_match, None
         else:
             return None, None  # No sufficiently close match found
+    
+    def recommend_songs(self):
+        """Recommend songs based on the genres of tracks in the playlist."""
 
-
-    def is_song_in_database(self, song_name):
-        """Helper function to check if a song title exists in the database."""
         try:
-            cursor = self.db_conn.cursor()
-            query = "SELECT COUNT(*) FROM Tracks WHERE LOWER(track_name) = %s"
-            cursor.execute(query, (song_name.lower(),))
-            result = cursor.fetchone()
-            cursor.close()
-            return result[0] > 0
-        except Error as e:
+            cursor = self.db_conn.cursor(dictionary=True)
+
+            # Step 1: Fetch all track IDs in the playlist and join with Tracks table to get genres
+            query = """
+                SELECT Tracks.genre 
+                FROM Playlist 
+                JOIN Tracks ON Playlist.trackID = Tracks.id
+            """
+            cursor.execute(query)
+            playlist_genres_raw = [row['genre'] for row in cursor.fetchall()]
+
+            # Split genres by semicolon and flatten into a list of individual genres
+            playlist_genres = []
+            for genre_string in playlist_genres_raw:
+                playlist_genres.extend([genre.strip() for genre in genre_string.split(';')])
+
+            # Check if the playlist is empty
+            if not playlist_genres:
+                return "Your playlist is empty. Add some songs to get recommendations!"
+
+            # Step 2: Find the two most common genres
+            genre_counts = Counter(playlist_genres)
+            top_genres = [genre for genre, _ in genre_counts.most_common(2)]
+
+            print(top_genres)
+
+            # Step 3: Fetch recommendations for each genre, excluding songs already in the playlist
+            recommendations = []
+
+            for genre in top_genres:
+                query = """
+                    SELECT track_name, artist_name, popularity 
+                    FROM Tracks 
+                    WHERE genre LIKE %s AND id NOT IN (
+                        SELECT trackID FROM Playlist
+                    )
+                    ORDER BY popularity DESC 
+                    LIMIT 10
+                """
+                cursor.execute(query, (f"%{genre}%",))
+                results = cursor.fetchall()
+                recommendations.extend(results)
+
+            # Limit to 10 recommendations if more than 2 genres exist
+            recommendations = recommendations[:10]
+
+            # Format recommendations as strings for response
+            recommendation_list = ", ".join(
+                f"{rec['track_name']} by {rec['artist_name']} (Popularity: {rec['popularity']})" for rec in recommendations
+            )
+            response = f"Your playlist is based on the following genres: {', '.join(top_genres)}. Based on your playlist, here are some song recommendations:\n{recommendation_list}"
+
+        except mysql.connector.Error as e:
+            response = "There was an error fetching recommendations. Please try again."
             print(f"Database error: {e}")
-            return False
+        finally:
+            cursor.close()
+
+        return response
+
 
     #########################
     ### CHATBOT RESPONSES ###
@@ -213,10 +289,7 @@ class MusicAgent(Agent):
 
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
-                response = AnnotatedUtterance(
-                    f"There are multiple tracks containing '{song_name}'. Possible tracks: {track_list}. Please specify the artist.",
-                    participant=DialogueParticipant.AGENT,
-                )
+                response = f"There are multiple tracks containing '{song_name}'. Possible tracks: {track_list}. Please specify the artist."
             else:
                 # If artist is provided or only one track matches, filter or use the correct track
                 if specified_artist:
@@ -232,60 +305,30 @@ class MusicAgent(Agent):
                         if self.add_track_to_playlist(track_info["id"]):
                             illusionOfFreeChoice = choice([1,2,3])
                             if illusionOfFreeChoice == 1:
-                                response = AnnotatedUtterance(
-                                    f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the song, just say 'tell me about song {track_info['track_name']}' or 'what is song {track_info['track_name']} by artist {track_info['artist_name']}'.",
-                                    participant=DialogueParticipant.AGENT,
-                                )
+                                response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the song, just say 'tell me about song {track_info['track_name']}' or 'what is song {track_info['track_name']} by artist {track_info['artist_name']}'."
                             elif illusionOfFreeChoice == 2:
-                                response = AnnotatedUtterance(
-                                    f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for the album this song is in, just say 'in which album is song {track_info['track_name']} by {track_info['artist_name']}'.",
-                                    participant=DialogueParticipant.AGENT,
-                                )
+                                response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for the album this song is in, just say 'in which album is song {track_info['track_name']} by {track_info['artist_name']}'."
                             else:
-                                response = AnnotatedUtterance(
-                                    f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the artist, just say 'show me all songs by {track_info['artist_name']}'.",
-                                    participant=DialogueParticipant.AGENT,
-                                )
+                                response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the artist, just say 'show me all songs by {track_info['artist_name']}'."
                         else:
-                            response = AnnotatedUtterance(
-                                "Track already exists in playlist",
-                                participant=DialogueParticipant.AGENT,
-                            )
+                            response = "Track already exists in playlist",
                     else:
-                        response = AnnotatedUtterance(
-                            f"No track found named '{song_name}' with artist '{specified_artist}'.",
-                            participant=DialogueParticipant.AGENT,
-                        )
+                        response = f"No track found named '{song_name}' with artist '{specified_artist}'."
                 else:
                     # If no artist was specified and there's only one match
                     track_info = tracks[0]
                     if self.add_track_to_playlist(track_info["id"]):
                         illusionOfFreeChoice = choice([1,2,3])
                         if illusionOfFreeChoice == 1:
-                            response = AnnotatedUtterance(
-                                f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the song, just say 'tell me about song {track_info['track_name']}' or 'what is song {track_info['track_name']} by artist {track_info['artist_name']}'.",
-                                participant=DialogueParticipant.AGENT,
-                            )
+                            response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the song, just say 'tell me about song {track_info['track_name']}' or 'what is song {track_info['track_name']} by artist {track_info['artist_name']}'."
                         elif illusionOfFreeChoice == 2:
-                            response = AnnotatedUtterance(
-                                f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for the album this song is in, just say 'in which album is song {track_info['track_name']} by {track_info['artist_name']}'.",
-                                participant=DialogueParticipant.AGENT,
-                            )
+                            response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for the album this song is in, just say 'in which album is song {track_info['track_name']} by {track_info['artist_name']}'."
                         else:
-                            response = AnnotatedUtterance(
-                                f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the artist, just say 'show me all songs by {track_info['artist_name']}'.",
-                                participant=DialogueParticipant.AGENT,
-                            )
+                            response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the artist, just say 'show me all songs by {track_info['artist_name']}'."
                     else:
-                        response = AnnotatedUtterance(
-                            "Track already exists in playlist",
-                            participant=DialogueParticipant.AGENT,
-                        )
+                        response = "Track already exists in playlist"
         else:
-            response = AnnotatedUtterance(
-                "Track not found in the database.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = "Track not found in the database."
         return response
 
     def remove_songs(self, user_input):
@@ -293,64 +336,43 @@ class MusicAgent(Agent):
         song_name, specified_artist = self.extract_song_name(user_input)
 
         if self.remove_track_from_playlist_by_name(song_name, specified_artist):
-            response = AnnotatedUtterance(
-                f"Removed {song_name} from the playlist.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"Removed {song_name} from the playlist."
         else:
-            response = AnnotatedUtterance(
-                f"Song {song_name} not found in playlist",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"Song {song_name} not found in playlist"
         return response
     
     def clear_playlist(self):
         """Clear the playlist."""
         self.clear_playlist_from_db()
-        response = AnnotatedUtterance(
-            "Playlist cleared. All songs removed",
-            participant=DialogueParticipant.AGENT,
-        )
+        response = "Playlist cleared. All songs removed"
         return response
     
     def view_playlist(self):
         """View the playlist."""
         songs = self.view_playlist_from_db()
         if not songs:
-            response = AnnotatedUtterance(
-                "Your playlist is empty.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = "Your playlist is empty."
             return response
         playlist_info = "Your playlist contains the following songs: "
         for song in songs:
-            playlist_info += f"{song['track_name']} by {song['artist_name']} from the album {song['album_name']}"
+            playlist_info += f"{song['track_name']} by {song['artist_name']} from the album {song['album_name']}. Genre: {song['genre']}. Popularity: {song['popularity']}"
             if song != songs[-1]:
                 playlist_info += ", "
-        response = AnnotatedUtterance(
-            playlist_info,
-            participant=DialogueParticipant.AGENT,
-        )
+        response = playlist_info
         return response
     
     def number_of_songs_in_album(self, user_input):
         """Get the number of songs in an album."""
         album_name = user_input.split("album")[1].strip()
         song_count = self.count_songs_in_album(album_name)
-        response = AnnotatedUtterance(
-            f"The album '{album_name}' contains {song_count} song(s).",
-            participant=DialogueParticipant.AGENT,
-        )
+        response = f"The album '{album_name}' contains {song_count} song(s)."
         return response
     
     def number_of_songs_by_artist(self, user_input):
         """Get the number of songs in an album."""
         artist_name = user_input.split("by")[1].strip()
         song_count = self.count_songs_by_artist(artist_name)
-        response = AnnotatedUtterance(
-            f"The artist '{artist_name}' has written {song_count} song(s).",
-            participant=DialogueParticipant.AGENT,
-        )
+        response = f"The artist '{artist_name}' has written {song_count} song(s)."
         return response
     
     def who_wrote_song(self, user_input):
@@ -358,15 +380,9 @@ class MusicAgent(Agent):
         track_name = user_input.split("song")[1].strip()
         artist = self.get_artist_of_song(track_name)
         if artist:
-            response = AnnotatedUtterance(
-                f"The song '{track_name}' was written by {artist}.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"The song '{track_name}' was written by {artist}."
         else:
-            response = AnnotatedUtterance(
-                f"I couldn't find the artist for the song '{track_name}'.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"I couldn't find the artist for the song '{track_name}'."
         return response
     
     def in_which_album(self, user_input):
@@ -380,10 +396,7 @@ class MusicAgent(Agent):
                 track_name = user_input.split("song")[1].strip()
                 specified_artist = None  # No artist specified initially
         else:
-            response = AnnotatedUtterance(
-                "I'm sorry, I didn't understand you. Please try again.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = "I'm sorry, I didn't understand you. Please try again."
             return response
 
         tracks = self.fetch_tracks_from_db_by_track_name(track_name)
@@ -399,10 +412,7 @@ class MusicAgent(Agent):
 
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
-                response = AnnotatedUtterance(
-                    f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist.",
-                    participant=DialogueParticipant.AGENT,
-                )
+                response = f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist."
             else:
                 # If artist is provided or only one track matches, filter or use the correct track
                 if specified_artist:
@@ -415,27 +425,15 @@ class MusicAgent(Agent):
 
                     if matching_tracks:  # Proceed if there's a matching track
                         track_info = matching_tracks[0]  # First match (or modify to let the user choose)
-                        response = AnnotatedUtterance(
-                            f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'.",
-                            participant=DialogueParticipant.AGENT,
-                        )
+                        response = f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'."
                     else:
-                        response = AnnotatedUtterance(
-                            f"No track found named '{track_name}' with artist '{specified_artist}'.",
-                            participant=DialogueParticipant.AGENT,
-                        )
+                        response = f"No track found named '{track_name}' with artist '{specified_artist}'."
                 else:
                     # If no artist was specified and there's only one match
                     track_info = tracks[0]
-                    response = AnnotatedUtterance(
-                        f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'.",
-                        participant=DialogueParticipant.AGENT,
-                    )
+                    response = f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'."
         else:
-            response = AnnotatedUtterance(
-                "Track not found in the database.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = "Track not found in the database."
         return response
     
     def tell_me_about_song(self, user_input):
@@ -449,10 +447,7 @@ class MusicAgent(Agent):
                 track_name = user_input.split("song")[1].strip()
                 specified_artist = None  # No artist specified initially
         else:
-            response = AnnotatedUtterance(
-                "I'm sorry, I didn't understand you. Please try again.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = "I'm sorry, I didn't understand you. Please try again."
             return response
 
         tracks = self.fetch_tracks_from_db_by_track_name(track_name)
@@ -468,10 +463,7 @@ class MusicAgent(Agent):
 
                 # Construct a message listing the artists
                 track_list = ", ".join(possible_tracks)
-                response = AnnotatedUtterance(
-                    f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist.",
-                    participant=DialogueParticipant.AGENT,
-                )
+                response = f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist."
             else:
                 # If artist is provided or only one track matches, filter or use the correct track
                 if specified_artist:
@@ -484,27 +476,15 @@ class MusicAgent(Agent):
 
                     if matching_tracks:  # Proceed if there's a matching track
                         track_info = matching_tracks[0]  # First match (or modify to let the user choose)
-                        response = AnnotatedUtterance(
-                            f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'.",
-                            participant=DialogueParticipant.AGENT,
-                        )
+                        response = f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'."
                     else:
-                        response = AnnotatedUtterance(
-                            f"No track found named '{track_name}' with artist '{specified_artist}'.",
-                            participant=DialogueParticipant.AGENT,
-                        )
+                        response = f"No track found named '{track_name}' with artist '{specified_artist}'."
                 else:
                     # If no artist was specified and there's only one match
                     track_info = tracks[0]
-                    response = AnnotatedUtterance(
-                        f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'.",
-                        participant=DialogueParticipant.AGENT,
-                    )
+                    response = f"The song '{track_info['track_name']}' was written by {track_info['artist_name']} and is from the album '{track_info['album_name']}'."
         else:
-            response = AnnotatedUtterance(
-                "Track not found in the database.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = "Track not found in the database."
         return response
     
     def show_songs_from_album(self, user_input):
@@ -514,15 +494,9 @@ class MusicAgent(Agent):
         
         if songs:
             song_list = ', '.join([f"{song['track_name']} by {song['artist_name']}" for song in songs])
-            response = AnnotatedUtterance(
-                f"Here are the songs from the album '{album_name}': {song_list}.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"Here are the songs from the album '{album_name}': {song_list}."
         else:
-            response = AnnotatedUtterance(
-                f"I couldn't find any songs from the album '{album_name}'.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"I couldn't find any songs from the album '{album_name}'."
         return response
     
     def show_songs_by_artist(self, user_input):
@@ -532,23 +506,14 @@ class MusicAgent(Agent):
         
         if songs:
             song_list = ', '.join([f"{song['track_name']} by {song['artist_name']}" for song in songs])
-            response = AnnotatedUtterance(
-                f"Here are the songs by the artist '{artist_name}': {song_list}.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"Here are the songs by the artist '{artist_name}': {song_list}."
         else:
-            response = AnnotatedUtterance(
-                f"I couldn't find any songs by the artist '{artist_name}'.",
-                participant=DialogueParticipant.AGENT,
-            )
+            response = f"I couldn't find any songs by the artist '{artist_name}'."
         return response
     
     def how_do_you_work(self):
         """How do you work?"""
-        response = AnnotatedUtterance(
-            "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like.",
-            participant=DialogueParticipant.AGENT,
-        )
+        response = "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like."
         return response
 
     ########################
@@ -621,7 +586,7 @@ class MusicAgent(Agent):
         """View the playlist."""
         try:
             cursor = self.db_conn.cursor(dictionary=True)
-            query = "SELECT id, track_name, artist_name, album_name FROM Tracks WHERE id IN (SELECT trackID FROM Playlist)"
+            query = "SELECT id, track_name, artist_name, album_name, genre, popularity FROM Tracks WHERE id IN (SELECT trackID FROM Playlist)"
             cursor.execute(query)
             result = cursor.fetchall()
             return result if result else []

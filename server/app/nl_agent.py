@@ -102,6 +102,12 @@ class MusicAgent(Agent):
                 response,
                 participant=DialogueParticipant.AGENT,
             )
+        elif intent == "functionality":
+            response = self.functionality()
+            utterance = AnnotatedUtterance(
+                response,
+                participant=DialogueParticipant.AGENT,
+            )
         elif intent == "greeting":
             utterance = self.welcome()
         elif intent == "exit":
@@ -127,23 +133,6 @@ class MusicAgent(Agent):
             print(f"Error fetching track from database: {e}")
             return None
         
-    #####################
-    ### MODEL METHODS ###
-    #####################
-
-    def preprocess_input(self, text):
-        """Preprocess user input (e.g., lowercasing, removing punctuation)."""
-        return text.lower()
-
-    def interpret_input(self, user_input):
-        """Use the SVM model to interpret the intent from user input."""
-        processed_input = self.preprocess_input(user_input)
-        vectorized_input = self.vectorizer.transform([processed_input])  # Vectorize the input
-        
-        # Make the prediction
-        prediction = self.natural_model.predict(vectorized_input)
-        return prediction
-
     def extract_song_name(self, sentence):
         """Extract the most likely song name from the sentence, using consecutive word matches."""
         # Fetch all song titles from the database
@@ -230,7 +219,7 @@ class MusicAgent(Agent):
 
             # Step 2: Find the two most common genres
             genre_counts = Counter(playlist_genres)
-            top_genres = [genre for genre, _ in genre_counts.most_common(2)]
+            top_genres = [genre for genre, _ in genre_counts.most_common(3)]
 
             print(top_genres)
 
@@ -245,14 +234,14 @@ class MusicAgent(Agent):
                         SELECT trackID FROM Playlist
                     )
                     ORDER BY popularity DESC 
-                    LIMIT 10
+                    LIMIT 5
                 """
                 cursor.execute(query, (f"%{genre}%",))
                 results = cursor.fetchall()
                 recommendations.extend(results)
 
-            # Limit to 10 recommendations if more than 2 genres exist
-            recommendations = recommendations[:10]
+            # Limit to 15 recommendations if more than 3 genres exist
+            recommendations = recommendations[:15]
 
             # Format recommendations as strings for response
             recommendation_list = ", ".join(
@@ -267,6 +256,28 @@ class MusicAgent(Agent):
             cursor.close()
 
         return response
+    
+    def functionality(self):
+        """What can you do?"""
+        response = "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like."
+        return response
+        
+    #####################
+    ### MODEL METHODS ###
+    #####################
+
+    def preprocess_input(self, text):
+        """Preprocess user input (e.g., lowercasing, removing punctuation)."""
+        return text.lower()
+
+    def interpret_input(self, user_input):
+        """Use the SVM model to interpret the intent from user input."""
+        processed_input = self.preprocess_input(user_input)
+        vectorized_input = self.vectorizer.transform([processed_input])  # Vectorize the input
+        
+        # Make the prediction
+        prediction = self.natural_model.predict(vectorized_input)
+        return prediction
 
 
     #########################
@@ -510,11 +521,7 @@ class MusicAgent(Agent):
         else:
             response = f"I couldn't find any songs by the artist '{artist_name}'."
         return response
-    
-    def how_do_you_work(self):
-        """How do you work?"""
-        response = "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like."
-        return response
+
 
     ########################
     ### DATABASE PROMPTS ###

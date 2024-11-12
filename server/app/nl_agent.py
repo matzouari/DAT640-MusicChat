@@ -86,15 +86,15 @@ class MusicAgent(Agent):
         return list(artists)  # Convert set back to a list for further use
     
     def fetch_all_albums(self):
-        """Retrieve all album names from the database."""
+        """Retrieve all albums with their associated artists from the database."""
         try:
             cursor = self.db_conn.cursor(dictionary=True)
-            cursor.execute("SELECT DISTINCT album_name FROM Tracks")
-            albums = [row['album_name'] for row in cursor.fetchall()]
+            cursor.execute("SELECT DISTINCT album_name, artist_name FROM Tracks")
+            albums = [(row['album_name'], row['artist_name']) for row in cursor.fetchall()]
             cursor.close()
             return albums
         except Exception as e:
-            print(f"Database error while fetching albums: {e}")
+            print(f"Database error while fetching albums and artists: {e}")
             return []
     
     #####################
@@ -262,7 +262,7 @@ class MusicAgent(Agent):
             # Apply artist boost and popularity adjustment
             adjusted_score = track_score
             if artist_score_boost:
-                adjusted_score += 30  # Increase score if artist matches
+                adjusted_score += 30 # Increase score if artist matches
             adjusted_score += track["popularity"] / 10  # Adjust for popularity, scaled down
 
             scored_tracks.append((track, adjusted_score))
@@ -274,7 +274,7 @@ class MusicAgent(Agent):
         # Format the response to include the top recommended tracks
         response = "Based on your input, here are the top matching tracks: "
         response += " -- ".join(
-            f"{i+1}. {track['track_name']} by {track['artist_name']} (Score: {score:.1f}, Popularity: {track['popularity']})"
+            f"{i+1}. {track['track_name']} by {track['artist_name']}. Popularity: {track['popularity']}"
             for i, (track, score) in enumerate(top_tracks)
         )
         response += ". To add a song to your playlist, please enter the number corresponding to the song you want to add. For multiple songs, enter a comma-separated list of numbers. If you want to exit, enter 'exit'."
@@ -598,34 +598,66 @@ class MusicAgent(Agent):
             return "I'm sorry, I couldn't understand your question. Could you rephrase it?"
 
     def extract_entity(self, question, entity_type):
-        """Extracts the most relevant entity (album or artist) using n-grams and fuzz score matching."""
+        """Extracts the most relevant entity (album or artist) using n-grams and fuzz score matching, with adjusted scoring for artist matches when looking for albums."""
         
-        # Choose the data to search in based on entity type
-        if entity_type == "album":
-            entity_list = self.albums_data
-        elif entity_type == "artist":
-            entity_list = self.artists_data
-        else:
-            return None
-
         words = question.lower().split()
         best_match = None
         highest_score = 0
 
-        # Iterate through possible n-grams within the question to match entities
-        for size in range(1, len(words) + 1):
-            for i in range(len(words) - size + 1):
-                ngram = " ".join(words[i:i + size])
+        # Case 1: If looking for an artist, only search self.artists_data
+        if entity_type == "artist":
+            for size in range(1, len(words) + 1):
+                for i in range(len(words) - size + 1):
+                    ngram = " ".join(words[i:i + size])
 
-                # Compare the ngram with each entity in the list using fuzz score
-                for entity in entity_list:
-                    score = fuzz.ratio(ngram, entity.lower())
-                    if score > highest_score:
-                        highest_score = score
-                        best_match = entity
+                    for artist in self.artists_data:
+                        artist_score = fuzz.ratio(ngram, artist.lower())
+                        weighted_score = artist_score * (1 + 0.1 * size)  # Boost for longer n-grams
 
-        # Define a threshold score to ensure the match is reasonably accurate
-        return best_match if highest_score > 60 else None
+                        if weighted_score > highest_score:
+                            highest_score = weighted_score
+                            best_match = artist
+
+            return best_match if highest_score > 60 else None
+
+        # Case 2: If looking for an album, search both albums and artists with adjusted scoring for album-artist matches
+        elif entity_type == "album":
+            # Step 1: Attempt to find an artist in the question
+            artist_match = None
+            highest_artist_score = 0
+            for size in range(1, len(words) + 1):
+                for i in range(len(words) - size + 1):
+                    ngram = " ".join(words[i:i + size])
+
+                    for artist in self.artists_data:
+                        artist_score = fuzz.ratio(ngram, artist.lower())
+                        if artist_score > highest_artist_score:
+                            highest_artist_score = artist_score
+                            artist_match = artist
+
+            # Step 2: Find the best matching album, adjusting score if the artist matches
+            for size in range(1, len(words) + 1):
+                for i in range(len(words) - size + 1):
+                    ngram = " ".join(words[i:i + size])
+
+                    for album, album_artist in self.albums_data:
+                        album_score = fuzz.ratio(ngram, album.lower())
+                        
+                        # Adjust album score if there's an artist match
+                        if artist_match and fuzz.ratio(artist_match.lower(), album_artist.lower()) > 60:
+                            album_score *= 1.2  # Boost score by 20% for artist match
+
+                        # Further boost for longer n-grams
+                        weighted_score = album_score * (1 + 0.1 * size)
+
+                        if weighted_score > highest_score:
+                            highest_score = weighted_score
+                            best_match = album
+
+            return best_match if highest_score > 60 else None
+
+        else:
+            return None
 
     def count_songs_in_album(self, album_name):
         """Return the count of songs in the specified album, along with their names."""
@@ -697,7 +729,7 @@ class MusicAgent(Agent):
             return response
         playlist_info = "Your playlist contains the following songs: "
         for song in songs:
-            playlist_info += f"{song['track_name']} by {song['artist_name']} from the album {song['album_name']}. Genre: {song['genre']}. Popularity: {song['popularity']}"
+            playlist_info += f"{song['track_name']} by {song['artist_name']} from the album {song['album_name']}. Genre: {song['genre']}."
             if song != songs[-1]:
                 playlist_info += " -- "
         response = playlist_info

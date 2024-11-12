@@ -557,4 +557,91 @@ sentence,intent
 "What are you designed to do?",functionality
 "What assistance do you offer?",functionality
 "Let me know your purpose.",functionality
-
+"Create a playlist for me",create
+"Can you make a new playlist",create
+"I want to create a playlist",create
+"Set up a new playlist",create
+"Please make a playlist for me",create
+"Make a playlist",create
+"Create a new playlist with some songs",create
+"Build a playlist",create
+"I need a playlist",create
+"Can you build me a playlist",create
+"Create a playlist with some good music",create
+"Generate a playlist for me",create
+"Make me a playlist",create
+"Start a new playlist for me",create
+"Add songs to create a playlist",create
+"Can you start a playlist for me",create
+"Help me create a playlist",create
+"Put together a playlist",create
+"Form a playlist with some tracks",create
+"Initiate a playlist",create
+"I'd like to make a playlist",create
+"Assemble a playlist for me",create
+"Can we put together a playlist",create
+"Let’s make a playlist",create
+"Prepare a playlist",create
+"Could you create a playlist",create
+"I need to start a new playlist",create
+"Build a playlist with my favorite songs",create
+"Put my favorite songs in a playlist",create
+"Start a playlist with some new songs",create
+"Get a playlist ready for me",create
+"Organize a playlist",create
+"Can you arrange a playlist",create
+"Please start a playlist",create
+"Generate a new playlist",create
+"I want a playlist made",create
+"Make a music playlist",create
+"Create a song playlist",create
+"Get a playlist going for me",create
+"Put songs in a playlist",create
+"Create a playlist to listen to",create
+"Let’s create a custom playlist",create
+"Prepare a personalized playlist",create
+"Which album is song X from?",question
+"How many albums feature artist X?",question
+"Who wrote the song X?",question
+"What genre is song X?",question
+"Can you tell me more about the album X?",question
+"How many songs are in album X?",question
+"What songs are in album X?",question
+"Who sings song X?",question
+"Which artist released album X?",question
+"When was album X released?",question
+"Is song X in the playlist?",question
+"How many songs are in the playlist?",question
+"Who performs on song X?",question
+"What are the top songs by artist X?",question
+"Can you list the albums by artist X?",question
+"What is the most popular song by artist X?",question
+"Which albums has artist X worked on?",question
+"Who features on song X?",question
+"Can you show me the songs by artist X?",question
+"How popular is song X?",question
+"Who produced album X?",question
+"What other songs are similar to song X?",question
+"Which artists are similar to artist X?",question
+"Are there any songs featuring artist X?",question
+"What is the length of song X?",question
+"Can you tell me about the song X?",question
+"Does album X have any awards?",question
+"Which songs are trending right now?",question
+"Is song X in any playlist?",question
+"How long is album X?",question
+"Where can I find more information about artist X?",question
+"Who are the collaborators on album X?",question
+"Can you tell me the genre of album X?",question
+"Is song X part of a soundtrack?",question
+"How many songs does artist X have?",question
+"Can you list the genres that artist X performs?",question
+"What’s the highest-charting song by artist X?",question
+"Are there any albums similar to album X?",question
+"Which songs are popular from album X?",question
+"How many albums does artist X have?",question
+"Who is featured in album X?",question
+"What albums came out in the same year as album X?",question
+"Which artist has the most songs in the playlist?",question
+"Can you give me details on song X?",question
+"What other albums are like album X?",question

@@ -233,29 +233,6 @@ class MusicAgent(Agent):
         
         return response
     
-    def select_song(self, choice):
-        """Select a song from the top_songs list by index and add it to the playlist."""
-        if self.top_songs and 1 <= int(choice) <= len(self.top_songs):
-            # Get the selected song ID based on user input (1-based index)
-            selected_song_id = self.top_songs[choice - 1]
-
-            # Add the selected song to the playlist in the database
-            try:
-                cursor = self.db_conn.cursor()
-                cursor.execute("INSERT INTO Playlist (trackID) VALUES (%s)", (selected_song_id,))
-                self.db_conn.commit()
-                response = "Song successfully added to your playlist."
-                self.top_songs = None  # Reset top_songs after adding a song
-            except mysql.connector.Error as e:
-                response = "There was an error adding the song to your playlist. Please try again."
-                print(f"Database error: {e}")
-            finally:
-                cursor.close()
-        else:
-            response = f"Please choose a number between 1 and {len(self.top_songs)}."
-            
-        return response
-    
     def recommend_songs(self):
         """Recommend songs based on the genres of tracks in the playlist."""
 
@@ -323,6 +300,95 @@ class MusicAgent(Agent):
 
         return response
     
+    def select_song(self, choice):
+        """Select a song from the top_songs list by index and add it to the playlist."""
+        if self.top_songs and 1 <= int(choice) <= len(self.top_songs):
+            # Get the selected song ID based on user input (1-based index)
+            selected_song_id = self.top_songs[choice - 1]
+
+            # Add the selected song to the playlist in the database
+            try:
+                cursor = self.db_conn.cursor()
+                cursor.execute("INSERT INTO Playlist (trackID) VALUES (%s)", (selected_song_id,))
+                self.db_conn.commit()
+                response = "Song successfully added to your playlist."
+                self.top_songs = None  # Reset top_songs after adding a song
+            except mysql.connector.Error as e:
+                response = "There was an error adding the song to your playlist. Please try again."
+                print(f"Database error: {e}")
+            finally:
+                cursor.close()
+        else:
+            response = f"Please choose a number between 1 and {len(self.top_songs)}."
+            
+        return response
+
+    def remove_songs(self, user_input):
+        """Remove the top-matching song from the playlist based on the user's input."""
+
+        # Step 1: Generate n-grams from the input sentence to identify possible artists
+        split_sentence = user_input.lower().split()
+        possible_artists = []
+        
+        # Generate n-grams (1 to 3 words) from the input sentence for artist name matching
+        for n in range(1, 4):
+            ngram_list = [' '.join(ngram) for ngram in ngrams(split_sentence, n)]
+            possible_artists.extend(ngram_list)
+
+        try:
+            # Step 2: Fetch all tracks in the playlist with their details
+            cursor = self.db_conn.cursor(dictionary=True)
+            query = """
+                SELECT Tracks.id, Tracks.track_name, Tracks.artist_name 
+                FROM Playlist 
+                JOIN Tracks ON Playlist.trackID = Tracks.id
+            """
+            cursor.execute(query)
+            playlist_tracks = cursor.fetchall()
+            
+            # Check if the playlist is empty
+            if not playlist_tracks:
+                return "Your playlist is empty. There are no songs to remove."
+
+            # Step 3: Calculate fuzz scores for each track in the playlist
+            scored_tracks = []
+            for track in playlist_tracks:
+                track_score = fuzz.token_sort_ratio(user_input.lower(), track["track_name"].lower())
+                
+                # Check if any of the track's artists match known artists
+                track_artists = [artist.strip().lower() for artist in track["artist_name"].split(';')]
+                artist_score_boost = any(
+                    fuzz.token_sort_ratio(artist, possible_artist) > 70 for artist in track_artists for possible_artist in possible_artists
+                )
+                
+                # Apply artist boost
+                adjusted_score = track_score
+                if artist_score_boost:
+                    adjusted_score += 30  # Increase score if artist matches
+
+                scored_tracks.append((track, adjusted_score))
+            
+            # Step 4: Sort by adjusted score and select the top track
+            best_match = max(scored_tracks, key=lambda x: x[1], default=None)
+
+            if best_match and best_match[1] > 60:  # Threshold for match confidence
+                track_to_remove = best_match[0]
+                # Remove the selected track from the playlist
+                cursor.execute("DELETE FROM Playlist WHERE trackID = %s", (track_to_remove['id'],))
+                self.db_conn.commit()
+                response = f"Removed {track_to_remove['track_name']} by {track_to_remove['artist_name']} from your playlist."
+            else:
+                response = "No matching song found in your playlist. Please try again with a different title or artist."
+
+        except mysql.connector.Error as e:
+            response = "There was an error removing the song from your playlist. Please try again."
+            print(f"Database error: {e}")
+        finally:
+            cursor.close()
+
+        return response
+
+    
     def functionality(self):
         """What can you do?"""
         response = "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like."
@@ -352,13 +418,29 @@ class MusicAgent(Agent):
     
     def clear_playlist(self):
         """Clear the playlist."""
-        self.clear_playlist_from_db()
-        response = "Playlist cleared. All songs removed"
+        try:
+            cursor = self.db_conn.cursor()
+            query = "DELETE FROM Playlist"
+            cursor.execute(query)
+            self.db_conn.commit()
+            response = "Playlist cleared. All songs removed"
+        except Error as e:
+            response = "There was an error clearing the playlist. Please try again."
+            print(f"Database error: {e}")
+        finally:
+            cursor.close()
         return response
     
     def view_playlist(self):
         """View the playlist."""
-        songs = self.view_playlist_from_db()
+        songs = []
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            query = "SELECT id, track_name, artist_name, album_name, genre, popularity FROM Tracks WHERE id IN (SELECT trackID FROM Playlist)"
+            cursor.execute(query)
+            songs = cursor.fetchall()
+        except Error as e:
+            print(f"Error viewing playlist: {e}")
         if not songs:
             response = "Your playlist is empty."
             return response
@@ -527,19 +609,6 @@ class MusicAgent(Agent):
 
     ### PLAYLIST PROMPTS ###
 
-    def add_track_to_playlist(self, track_id):
-        """Add a track to the playlist."""
-        try:
-            cursor = self.db_conn.cursor()
-            query = "INSERT INTO Playlist (trackID) VALUES (%s)"
-            cursor.execute(query, (track_id,))
-            print(track_id)
-            self.db_conn.commit()
-            return True
-        except Error as e:
-            print(f"Error adding track to playlist: {e}")
-            return False
-
     def remove_track_from_playlist(self, track_id):
         """Remove a track from the playlist."""
         try:
@@ -574,30 +643,6 @@ class MusicAgent(Agent):
         except Error as e:
             print(f"Error removing track from playlist: {e}")
             return False
-        
-    def clear_playlist_from_db(self):
-        """Clear the playlist."""
-        try:
-            cursor = self.db_conn.cursor()
-            query = "DELETE FROM Playlist"
-            cursor.execute(query)
-            self.db_conn.commit()
-            return True
-        except Error as e:
-            print(f"Error clearing playlist: {e}")
-            return False
-    
-    def view_playlist_from_db(self):
-        """View the playlist."""
-        try:
-            cursor = self.db_conn.cursor(dictionary=True)
-            query = "SELECT id, track_name, artist_name, album_name, genre, popularity FROM Tracks WHERE id IN (SELECT trackID FROM Playlist)"
-            cursor.execute(query)
-            result = cursor.fetchall()
-            return result if result else []
-        except Error as e:
-            print(f"Error viewing playlist: {e}")
-            return []
 
     ### DATABASE PROMPTS ###
 
@@ -700,8 +745,4 @@ class MusicAgent(Agent):
         except Error as e:
             print(f"Error fetching songs: {e}")
             return []
-        
-## TODO ## 
-# Change the playlist to be fully handled by the database
-# Frontend show the playlist
 

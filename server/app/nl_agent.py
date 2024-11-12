@@ -309,8 +309,6 @@ class MusicAgent(Agent):
             genre_counts = Counter(playlist_genres)
             top_genres = [genre for genre, _ in genre_counts.most_common(3)]
 
-            print(top_genres)
-
             # Step 3: Fetch recommendations for each genre, excluding songs already in the playlist
             recommendations = []
 
@@ -596,22 +594,38 @@ class MusicAgent(Agent):
             artist_name = self.extract_entity(question, "artist")
             return self.count_albums_by_artist(artist_name)
         
-        elif intent == "find_artist_of_song":
-            song_name = self.extract_entity(question, "song")
-            return self.find_artist_of_song(song_name)
-        
         else:
             return "I'm sorry, I couldn't understand your question. Could you rephrase it?"
 
     def extract_entity(self, question, entity_type):
-        """Extracts relevant entities (album, artist, song) based on question type."""
+        """Extracts the most relevant entity (album or artist) using n-grams and fuzz score matching."""
+        
+        # Choose the data to search in based on entity type
         if entity_type == "album":
-            match = re.search(r"album (.+)", question, re.IGNORECASE)
+            entity_list = self.albums_data
         elif entity_type == "artist":
-            match = re.search(r"artist (.+)", question, re.IGNORECASE)
-        elif entity_type == "song":
-            match = re.search(r"song (.+)", question, re.IGNORECASE)
-        return match.group(1).strip() if match else None
+            entity_list = self.artists_data
+        else:
+            return None
+
+        words = question.lower().split()
+        best_match = None
+        highest_score = 0
+
+        # Iterate through possible n-grams within the question to match entities
+        for size in range(1, len(words) + 1):
+            for i in range(len(words) - size + 1):
+                ngram = " ".join(words[i:i + size])
+
+                # Compare the ngram with each entity in the list using fuzz score
+                for entity in entity_list:
+                    score = fuzz.ratio(ngram, entity.lower())
+                    if score > highest_score:
+                        highest_score = score
+                        best_match = entity
+
+        # Define a threshold score to ensure the match is reasonably accurate
+        return best_match if highest_score > 60 else None
 
     def count_songs_in_album(self, album_name):
         """Return the count of songs in the specified album, along with their names."""
@@ -626,8 +640,7 @@ class MusicAgent(Agent):
             if songs:
                 song_names = [song[0] for song in songs]
                 song_count = len(song_names)
-                song_list = " -- ".join(song_names)
-                return f"The album '{album_name}' contains {song_count} song(s): {song_list}."
+                return f"The album '{album_name}' contains {song_count} song(s)."
             else:
                 return f"I couldn't find any songs in the album '{album_name}'."
         except Exception as e:
@@ -647,8 +660,7 @@ class MusicAgent(Agent):
             if albums:
                 album_names = [album[0] for album in albums]
                 album_count = len(album_names)
-                album_list = " -- ".join(album_names)
-                return f"The artist '{artist_name}' is featured on {album_count} album(s): {album_list}."
+                return f"The artist '{artist_name}' is featured on {album_count} album(s)."
             else:
                 return f"I couldn't find any albums by the artist '{artist_name}'."
         except Exception as e:
@@ -699,10 +711,10 @@ class MusicAgent(Agent):
 
 """
 R4 : 10 points
-R5 : 6 points
+R5 : 8 points
 - Model = 6 points OK
 - Position-based prompts = 3 points TODO
-- Query-based prompts = 3 points TODO
+- Query-based prompts = 3 points TODO 2/3 OK
 R6 : 8 points
 - Recommendation = 2 points OK
 - Way to select = 3 points OK (5 TODO if we add natural language processing)

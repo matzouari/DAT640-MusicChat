@@ -5,6 +5,44 @@ question,intent
 "How many albums does artist Michael Jackson have?",count_albums_by_artist
 "Tell me how many albums artist X has",count_albums_by_artist
 "What is the total number of albums by artist Madonna?",count_albums_by_artist
-"Which artist wrote song Yesterday?",find_artist_of_song
-"Who wrote the song Bohemian Rhapsody?",find_artist_of_song
-"Can you tell me who wrote song X?",find_artist_of_song
+"How many songs are in album Abbey Road?",count_songs_in_album
+"Can you tell me the number of songs in album Rumours?",count_songs_in_album
+"I need to know how many songs are in album Thriller.",count_songs_in_album
+"What's the total number of tracks in album Hotel California?",count_songs_in_album
+"How many tracks does album Back in Black have?",count_songs_in_album
+"Count the songs in Dark Side of the Moon.",count_songs_in_album
+"How many songs does the Sgt. Pepper's Lonely Hearts Club Band have?",count_songs_in_album
+"Tell me how many tracks are in Sticky Fingers.",count_songs_in_album
+"How many songs can be found in Born in the U.S.A.?",count_songs_in_album
+"What's the song count for Led Zeppelin IV?",count_songs_in_album
+"Could you tell me the number of songs in Purple Rain?",count_songs_in_album
+"Count the tracks on The Wall.",count_songs_in_album
+"I’d like to know how many songs are in album Pet Sounds.",count_songs_in_album
+"What's the track count for album A Night at the Opera?",count_songs_in_album
+"Can you tell me how many songs are on album Thriller?",count_songs_in_album
+"Tell me the number of songs in album Let It Be.",count_songs_in_album
+"What's the song total for album What's Going On?",count_songs_in_album
+"How many songs are on the album Nevermind?",count_songs_in_album
+"Can you find the total number of songs in album Like a Prayer?",count_songs_in_album
+"How many tracks does the album Wish You Were Here have?",count_songs_in_album
+"How many albums does Prince have?",count_albums_by_artist
+"Can you tell me the number of albums Bob Dylan has?",count_albums_by_artist
+"What's the album count for The Beatles?",count_albums_by_artist
+"Tell me how many albums Bruce Springsteen has.",count_albums_by_artist
+"I want to know how many albums David Bowie has.",count_albums_by_artist
+"How many albums can be found by U2?",count_albums_by_artist
+"What's the total number of albums by Whitney Houston?",count_albums_by_artist
+"Count the albums released by artist Led Zeppelin.",count_albums_by_artist
+"Tell me the number of albums artist Paul McCartney has.",count_albums_by_artist
+"How many records does artist Queen have?",count_albums_by_artist
+"I need to know how many albums are by artist Bob Marley.",count_albums_by_artist
+"How many albums did artist Marvin Gaye release?",count_albums_by_artist
+"What's the album total for artist The Rolling Stones?",count_albums_by_artist
+"Can you count the albums by artist Stevie Wonder?",count_albums_by_artist
+"How many albums did artist Aretha Franklin release?",count_albums_by_artist
+"How many albums does artist Pink Floyd have?",count_albums_by_artist
+"Tell me how many records artist Beyoncé has.",count_albums_by_artist
+"Could you list the album count for artist Jay-Z?",count_albums_by_artist
+"What's the total number of albums for artist Elton John?",count_albums_by_artist
+"I want the number of albums by artist Billy Joel.",count_albums_by_artist
+"How many albums has artist Fleetwood Mac released?",count_albums_by_artist

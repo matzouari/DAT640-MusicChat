@@ -37,6 +37,9 @@ class MusicAgent(Agent):
 
         # Establishing the connection
         self.db_conn = self.connect_to_db(db_config)
+        self.tracks_data = self.fetch_all_tracks()
+        self.artists_data = self.extract_unique_artists()
+        self.top_songs = None 
 
     def connect_to_db(self, db_config):
         """Connect to MySQL database."""
@@ -49,6 +52,28 @@ class MusicAgent(Agent):
             print(f"Database connection error: {err}")
             return None
         
+    def fetch_all_tracks(self):
+        """Fetch all tracks and their attributes once upon initialization."""
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            cursor.execute("SELECT id, track_name, artist_name, genre, popularity FROM Tracks")
+            tracks = cursor.fetchall()
+        except mysql.connector.Error as e:
+            print(f"Database error during initialization: {e}")
+            tracks = []
+        finally:
+            cursor.close()
+        return tracks
+    
+    def extract_unique_artists(self):
+        """Extract unique artists from tracks data and handle multiple artists per track."""
+        artists = set()  # Using a set to avoid duplicates
+        for track in self.tracks_data:
+            artist_names = track["artist_name"].split(';')  # Split multiple artists
+            for artist in artist_names:
+                artists.add(artist.strip().lower())  # Add artist, stripping whitespace and lowercasing
+        return list(artists)  # Convert set back to a list for further use
+    
     def welcome(self) -> None:
         """Sends the agent's welcome message."""
         utterance = AnnotatedUtterance(
@@ -72,52 +97,75 @@ class MusicAgent(Agent):
         intent = self.interpret_input(user_input)
 
         # Dispatch to the appropriate method based on intent
-        if intent == "add":
-            response = self.add_songs(user_input)
-            utterance = AnnotatedUtterance(
-                response,
-                participant=DialogueParticipant.AGENT,
-            )
-        elif intent == "remove":
-            response = self.remove_songs(user_input)
-            utterance = AnnotatedUtterance(
-                response,
-                participant=DialogueParticipant.AGENT,
-            )
-        elif intent == "view":
-            response = self.view_playlist()
-            utterance = AnnotatedUtterance(
-                response,
-                participant=DialogueParticipant.AGENT,
-            )
-        elif intent == "clear":
-            response = self.clear_playlist()
-            utterance = AnnotatedUtterance(
-                response,
-                participant=DialogueParticipant.AGENT,
-            )
-        elif intent == "recommend":
-            response = self.recommend_songs()
-            utterance = AnnotatedUtterance(
-                response,
-                participant=DialogueParticipant.AGENT,
-            )
-        elif intent == "functionality":
-            response = self.functionality()
-            utterance = AnnotatedUtterance(
-                response,
-                participant=DialogueParticipant.AGENT,
-            )
-        elif intent == "greeting":
-            utterance = self.welcome()
-        elif intent == "exit":
-            utterance = self.goodbye()
+        if self.top_songs is None:
+            if intent == "add":
+                response = self.find_possible_songs(user_input)
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            elif intent == "remove":
+                response = self.remove_songs(user_input)
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            elif intent == "view":
+                response = self.view_playlist()
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            elif intent == "clear":
+                response = self.clear_playlist()
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            elif intent == "recommend":
+                response = self.recommend_songs()
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            elif intent == "functionality":
+                response = self.functionality()
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            elif intent == "greeting":
+                utterance = self.welcome()
+            elif intent == "exit":
+                utterance = self.goodbye()
+            else:
+                response = "I'm sorry, I didn't understand you. Please try again."
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
         else:
-            response = "I'm sorry, I didn't understand you. Please try again."
-            utterance = AnnotatedUtterance(
-                response,
-                participant=DialogueParticipant.AGENT,
-            )
+            if user_input == "exit":
+                self.top_songs = None  # Reset top_songs after exiting
+                response = "Not adding song to playlist. Exiting."
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            else:
+                try:
+                    user_input = int(user_input)
+                    response = self.select_song(user_input)
+                    utterance = AnnotatedUtterance(
+                        response,
+                        participant=DialogueParticipant.AGENT,
+                    )
+                except ValueError:
+                    response = f"Please choose a number between 1 and {len(self.top_songs)}, or enter 'exit' to exit."
+                    utterance = AnnotatedUtterance(
+                        response,
+                        participant=DialogueParticipant.AGENT,
+                    )
         self._dialogue_connector.register_agent_utterance(utterance)
 
     def fetch_track_from_db(self, song_name): # why u here
@@ -133,65 +181,79 @@ class MusicAgent(Agent):
             print(f"Error fetching track from database: {e}")
             return None
         
-    def extract_song_name(self, sentence):
-        """Extract the most likely song name from the sentence, using consecutive word matches."""
-        # Fetch all song titles from the database
-        all_songs = self.fetch_all_tracks_from_db()
+    def find_possible_songs(self, user_input):
+        """Add song by extracting possible artists and finding top track matches."""
+
+        # Step 1: Generate n-grams from the input sentence to identify possible artists
+        split_sentence = user_input.lower().split()
+        possible_artists = []
         
-        # Preprocess input by removing the first word (e.g., "add", "play", etc.) and lowercasing
-        split_sentence = sentence.split(' ')
-        new_sentence = ' '.join(split_sentence[1:]).lower()
+        # Generate n-grams (1 to 3 words) from the input sentence for artist name matching
+        for n in range(1, 4):
+            ngram_list = [' '.join(ngram) for ngram in ngrams(split_sentence, n)]
+            possible_artists.extend(ngram_list)
 
-        # Generate 2-3 word n-grams from the user's input for consecutive matching
-        ngram_matches = []
-        for n in range(1, 4):  # Generate bigrams and trigrams
-            ngram_matches.extend([' '.join(gram) for gram in ngrams(new_sentence.split(), n)])
+        # Filter possible artists to those that match known artists in artists_data
+        matching_artists = [
+            artist for artist in possible_artists if any(
+                fuzz.token_sort_ratio(artist, known_artist) > 70 for known_artist in self.artists_data
+            )
+        ]
         
-        # Initialize variables for tracking the best match
-        best_song_match = None
-        highest_song_score = 0
-        best_artist_match = None
-        highest_artist_score = 0
+        # Step 2: Calculate fuzz scores for each track based on track name and matching artists
+        scored_tracks = []
+        for track in self.tracks_data:
+            track_score = fuzz.token_sort_ratio(track["track_name"].lower(), user_input.lower())
+            
+            # Check if any of the track's artists match known artists
+            track_artists = [artist.strip().lower() for artist in track["artist_name"].split(';')]
+            artist_score_boost = any(
+                artist in matching_artists for artist in track_artists
+            )
+            
+            # Apply artist boost and popularity adjustment
+            adjusted_score = track_score
+            if artist_score_boost:
+                adjusted_score += 30  # Increase score if artist matches
+            adjusted_score += track["popularity"] / 10  # Adjust for popularity, scaled down
 
-        # Compare each n-gram to song titles in the database
-        for song in all_songs:
-            song_title = song["track_name"].lower()
-            title_word_count = len(song_title.split())
-
-            artist_name = song["artist_name"].lower()
-            for ngram in ngram_matches:
-                # Score each n-gram against the song title
-                score = fuzz.token_sort_ratio(ngram, song_title)
-
-                # Apply weighting based on word count in the title
-                if title_word_count == 1:
-                    weighted_score = score * 0.8  # Penalize single-word titles
-                elif 2 <= title_word_count <= 3:
-                    weighted_score = score * 1.2  # Boost for 2-3 word titles
-                else:
-                    weighted_score = score / (1 + (title_word_count - 3) * 0.1)  # Penalize longer titles
-
-                # Update best match if this weighted score is the highest
-                if weighted_score > highest_song_score:
-                    highest_song_score = weighted_score
-                    best_song_match = song_title
-
-                # Score each n-gram against the artist name
-                artist_score = fuzz.token_sort_ratio(ngram, artist_name)
-
-                # Update best artist match if this score is the highest
-                if artist_score > highest_artist_score:
-                    highest_artist_score = artist_score
-                    best_artist_match = artist_name
+            scored_tracks.append((track, adjusted_score))
+        
+        # Step 3: Sort by adjusted score and take the top 10 tracks
+        top_tracks = sorted(scored_tracks, key=lambda x: x[1], reverse=True)[:10]
+        self.top_songs = [track['id'] for track, _ in top_tracks]  # Store the top 10 song IDs
+        
+        # Format the response to include the top recommended tracks
+        response = "Based on your input, here are the top matching tracks:\n"
+        response += "\n".join(
+            f"{i+1}. {track['track_name']} by {track['artist_name']} (Score: {score:.1f}, Popularity: {track['popularity']})"
+            for i, (track, score) in enumerate(top_tracks)
+        )
+        
+        return response
     
+    def select_song(self, choice):
+        """Select a song from the top_songs list by index and add it to the playlist."""
+        if self.top_songs and 1 <= int(choice) <= len(self.top_songs):
+            # Get the selected song ID based on user input (1-based index)
+            selected_song_id = self.top_songs[choice - 1]
 
-        # Return the best match if it meets a reasonable threshold
-        if highest_song_score > 60:
-            if highest_artist_score > 80:
-                return best_song_match, best_artist_match
-            return best_song_match, None
+            # Add the selected song to the playlist in the database
+            try:
+                cursor = self.db_conn.cursor()
+                cursor.execute("INSERT INTO Playlist (trackID) VALUES (%s)", (selected_song_id,))
+                self.db_conn.commit()
+                response = "Song successfully added to your playlist."
+                self.top_songs = None  # Reset top_songs after adding a song
+            except mysql.connector.Error as e:
+                response = "There was an error adding the song to your playlist. Please try again."
+                print(f"Database error: {e}")
+            finally:
+                cursor.close()
         else:
-            return None, None  # No sufficiently close match found
+            response = f"Please choose a number between 1 and {len(self.top_songs)}."
+            
+        return response
     
     def recommend_songs(self):
         """Recommend songs based on the genres of tracks in the playlist."""
@@ -245,7 +307,7 @@ class MusicAgent(Agent):
 
             # Format recommendations as strings for response
             recommendation_list = ", ".join(
-                f"{rec['track_name']} by {rec['artist_name']} (Popularity: {rec['popularity']})" for rec in recommendations
+                f"{i+1}. {rec['track_name']} by {rec['artist_name']} (Popularity: {rec['popularity']})" for i, rec in enumerate(recommendations)
             )
             response = f"Your playlist is based on the following genres: {', '.join(top_genres)}. Based on your playlist, here are some song recommendations:\n{recommendation_list}"
 

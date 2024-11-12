@@ -27,6 +27,9 @@ class MusicAgent(Agent):
         # Load the trained natural language model for intent classification
         self.natural_model = joblib.load('app/model/intent_classifier_model.pkl')
         self.vectorizer = joblib.load('app/model/vectorizer.pkl')
+
+        self.genre_model = joblib.load('app/model/genre_intent_classifier_model.pkl')
+        self.genre_vectorizer = joblib.load('app/model/genre_vectorizer.pkl')
         
         # Database connection configuration
         db_config = {
@@ -154,6 +157,12 @@ class MusicAgent(Agent):
                     response,
                     participant=DialogueParticipant.AGENT,
                 )
+            elif intent == "create":
+                response = self.create_playlist(user_input)
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
             elif intent == "functionality":
                 response = self.functionality()
                 utterance = AnnotatedUtterance(
@@ -179,19 +188,11 @@ class MusicAgent(Agent):
                     participant=DialogueParticipant.AGENT,
                 )
             else:
-                try:
-                    user_input = int(user_input)
-                    response = self.select_song(user_input)
-                    utterance = AnnotatedUtterance(
-                        response,
-                        participant=DialogueParticipant.AGENT,
-                    )
-                except ValueError:
-                    response = f"Please choose a number between 1 and {len(self.top_songs)}, or enter 'exit' to exit."
-                    utterance = AnnotatedUtterance(
-                        response,
-                        participant=DialogueParticipant.AGENT,
-                    )
+                response = self.select_song(user_input)
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
         self._dialogue_connector.register_agent_utterance(utterance)
 
     def fetch_track_from_db(self, song_name): # why u here
@@ -250,12 +251,12 @@ class MusicAgent(Agent):
         self.top_songs = [track['id'] for track, _ in top_tracks]  # Store the top 10 song IDs
         
         # Format the response to include the top recommended tracks
-        response = "Based on your input, here are the top matching tracks:\n"
+        response = "Based on your input, here are the top matching tracks: "
         response += " -- ".join(
             f"{i+1}. {track['track_name']} by {track['artist_name']} (Score: {score:.1f}, Popularity: {track['popularity']})"
             for i, (track, score) in enumerate(top_tracks)
         )
-        response += ". To add a song to your playlist, please enter the number corresponding to the song you want to add. If you want to exit, enter 'exit'."
+        response += ". To add a song to your playlist, please enter the number corresponding to the song you want to add. For multiple songs, enter a comma-separated list of numbers. If you want to exit, enter 'exit'."
         
         return response
     
@@ -316,7 +317,7 @@ class MusicAgent(Agent):
                 f"{i+1}. {rec['track_name']} by {rec['artist_name']} (Popularity: {rec['popularity']})" for i, rec in enumerate(recommendations)
             )
             response = f"Your playlist is based on the following genres: {', '.join(top_genres)}. Based on your playlist, here are some song recommendations: {recommendation_list}"
-            response += ". To add a song to your playlist, please enter the number corresponding to the song you want to add. If you want to exit, enter 'exit'."
+            response += ". To add a song to your playlist, please enter the number corresponding to the song you want to add. For multiple songs, enter a comma-separated list of numbers. If you want to exit, enter 'exit'."
 
         except mysql.connector.Error as e:
             response = "There was an error fetching recommendations. Please try again."
@@ -327,27 +328,87 @@ class MusicAgent(Agent):
         return response
     
     def select_song(self, choice):
-        """Select a song from the top_songs list by index and add it to the playlist."""
-        if self.top_songs and 1 <= int(choice) <= len(self.top_songs):
-            # Get the selected song ID based on user input (1-based index)
-            selected_song_id = self.top_songs[choice - 1]
+        """Select one or more songs from the top_songs list based on user input."""
+        if not self.top_songs:
+            return "No songs available for selection. Please request recommendations or matches first."
 
-            # Add the selected song to the playlist in the database
-            try:
-                cursor = self.db_conn.cursor()
-                cursor.execute("INSERT INTO Playlist (trackID) VALUES (%s)", (selected_song_id,))
-                self.db_conn.commit()
-                response = "Song successfully added to your playlist."
-                self.top_songs = None  # Reset top_songs after adding a song
-            except mysql.connector.Error as e:
-                response = "There was an error adding the song to your playlist. Please try again."
-                print(f"Database error: {e}")
-            finally:
-                cursor.close()
-        else:
-            response = f"Please choose a number between 1 and {len(self.top_songs)}."
+        # Step 1: Parse the choice into a list of indices
+        try:
+            indices = [int(num.strip()) - 1 for num in choice.split(',')]  # Convert 1-based input to 0-based index
+        except ValueError:
+            return "Invalid input. Please specify song numbers separated by commas (e.g., '1, 3, 7')."
+
+        # Step 2: Validate indices and collect selected songs
+        selected_song_ids = []
+        for idx in indices:
+            if 0 <= idx < len(self.top_songs):
+                selected_song_ids.append(self.top_songs[idx])
+            else:
+                print(f"Skipping invalid song number {idx + 1}.")  # Inform about out-of-range indices
+
+        if not selected_song_ids:
+            return "No valid song numbers found. Please select valid song numbers from the list."
+
+        # Step 3: Add selected songs to the playlist and provide feedback
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            added_songs = []
             
-        return response
+            for song_id in selected_song_ids:
+                # Assuming Playlist table has a primary key or unique constraint to avoid duplicate entries
+                cursor.execute("INSERT IGNORE INTO Playlist (trackID) VALUES (%s)", (song_id,))
+                # Fetch song details for feedback
+                cursor.execute("SELECT track_name, artist_name FROM Tracks WHERE id = %s", (song_id,))
+                song = cursor.fetchone()
+                added_songs.append(f"{song['track_name']} by {song['artist_name']}")
+                
+            self.db_conn.commit()
+            cursor.close()
+            self.top_songs = None  # Reset top_songs after adding a song
+            return f"Successfully added song(s): {', '.join(added_songs)}" if added_songs else "No new songs were added to your playlist."
+
+        except mysql.connector.Error as e:
+            print(f"Database error: {e}")
+            return "There was an error adding the songs to your playlist. Please try again."
+        
+    def add_songs_by_genre(self, genre, num_songs=5):
+        """Add the most popular songs from a specified genre to the playlist."""
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+
+            # Step 1: Fetch the top songs of the specified genre, ordered by popularity
+            query = """
+                SELECT id, track_name, artist_name, popularity
+                FROM Tracks
+                WHERE genre LIKE %s
+                ORDER BY popularity DESC
+                LIMIT %s
+            """
+            cursor.execute(query, (f"%{genre}%", num_songs))
+            top_songs = cursor.fetchall()
+
+            if not top_songs:
+                return f"No songs found for the genre '{genre}'. Please try another genre."
+
+            # Step 2: Add each song to the playlist, ignoring duplicates
+            added_songs = []
+            for song in top_songs:
+                cursor.execute("INSERT IGNORE INTO Playlist (trackID) VALUES (%s)", (song['id'],))
+                added_songs.append(f"{song['track_name']} by {song['artist_name']} (Popularity: {song['popularity']})")
+            
+            self.db_conn.commit()
+            cursor.close()
+
+            # Step 3: Provide feedback to the user
+            return (
+                f"Added the following {len(added_songs)} song(s) from the genre '{genre}' to your playlist:" +
+                " -- ".join(added_songs)
+            )
+
+        except mysql.connector.Error as e:
+            print(f"Database error: {e}")
+            return "There was an error adding songs to your playlist. Please try again."
+
 
     def remove_songs(self, user_input):
         """Remove the top-matching song from the playlist based on the user's input."""
@@ -414,6 +475,91 @@ class MusicAgent(Agent):
 
         return response
     
+    def create_playlist(self, user_input):
+        """Create a playlist based on genre classification from the SVM model."""
+        
+        # Step 1: Use the SVM model to classify the genre category directly from the user input
+        vectorized_input = self.genre_vectorizer.transform([user_input])  # Vectorize the input
+        predicted_genre_category = self.genre_model.predict(vectorized_input)[0]
+
+        # Step 2: Add songs from the identified genre category to the playlist
+        response = self.add_songs_by_genre_category(predicted_genre_category, num_songs=10)
+        return response
+
+    def add_songs_by_genre_category(self, genre_category, num_songs=10):
+        """Adds multiple songs from all genres within a specified genre category, avoiding duplicates."""
+
+        # Define genre mappings for categories to retrieve multiple genres from each category
+        genre_mapping = {
+            "classical": ["classical", "classical performance", "baroque", "early music", "orchestral performance", 
+                        "classical era", "late romantic era", "early romantic era", "german romanticism", 
+                        "post-romantic era", "german baroque", "early modern classical", "opera", "choral"],
+            "rock": ["rock", "classic rock", "folk rock", "country rock", "album rock", "roots rock", 
+                    "art rock", "blues rock", "rock-and-roll"],
+            "jazz": ["jazz", "vocal jazz", "swing", "cool jazz", "big band", "brill building pop", 
+                    "adult standards"],
+            "hip hop": ["hip hop", "rap", "gangster rap", "pop rap", "southern hip hop", "trap"],
+            "pop": ["dance pop", "progressive house", "lounge", "easy listening", "mellow gold", 
+                    "latin", "funk", "soft rock"],
+            "folk": ["folk", "country rock", "tropical"],
+            "miscellaneous": ["sleep"]
+        }
+
+        genres_to_add = genre_mapping.get(genre_category, [])
+        added_songs = []
+
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+
+            # Step 1: Retrieve IDs of songs already in the playlist
+            cursor.execute("SELECT trackID FROM Playlist")
+            existing_song_ids = {row["trackID"] for row in cursor.fetchall()}
+
+            # Step 2: Fetch popular songs from each genre in the category, avoiding songs already in the playlist
+            for genre in genres_to_add:
+                if existing_song_ids:
+                    format_strings = ','.join(['%s'] * len(existing_song_ids))
+                    query = f"""
+                        SELECT id, track_name, artist_name, popularity
+                        FROM Tracks
+                        WHERE genre LIKE %s AND id NOT IN ({format_strings})
+                        ORDER BY popularity DESC
+                        LIMIT %s
+                    """
+                    params = [f"%{genre}%"] + list(existing_song_ids) + [num_songs // len(genres_to_add) or 1]
+                else:
+                    # If no songs are in the playlist, no need for NOT IN clause
+                    query = """
+                        SELECT id, track_name, artist_name, popularity
+                        FROM Tracks
+                        WHERE genre LIKE %s
+                        ORDER BY popularity DESC
+                        LIMIT %s
+                    """
+                    params = [f"%{genre}%", num_songs // len(genres_to_add) or 1]
+                
+                cursor.execute(query, params)
+                top_songs = cursor.fetchall()
+
+                for song in top_songs:
+                    # Add new songs to the playlist
+                    cursor.execute("INSERT IGNORE INTO Playlist (trackID) VALUES (%s)", (song['id'],))
+                    added_songs.append(f"{song['track_name']} by {song['artist_name']}")
+                    existing_song_ids.add(song['id'])  # Update the set to include the newly added song
+
+            self.db_conn.commit()
+            cursor.close()
+
+            # Provide feedback on the added songs
+            if added_songs:
+                return f"Added new songs to your playlist from the {genre_category} category:\n" + " -- ".join(added_songs)
+            else:
+                return f"No new songs found for the {genre_category} category."
+
+        except mysql.connector.Error as e:
+            print(f"Database error: {e}")
+            return "There was an error adding songs to your playlist. Please try again."
+    
     def clear_playlist(self):
         """Clear the playlist."""
         try:
@@ -428,30 +574,6 @@ class MusicAgent(Agent):
         finally:
             cursor.close()
         return response
-    
-    def update_frontend_playlist(self, playlist):
-        """Update the front-end dynamically by sending the playlist data."""
-        try:
-            # Assuming `self.db_conn` is being shared with Flask
-            cursor = self.db_conn.cursor(dictionary=True)
-            
-            # Prepare data for the front end
-            playlist_data = [
-                {
-                    "track_name": song["track_name"],
-                    "artist_name": song["artist_name"],
-                    "album_name": song["album_name"],
-                    "genre": song["genre"],
-                    "popularity": song["popularity"],
-                }
-                for song in playlist
-            ]
-
-            # Send data via a Flask API (ensure the endpoint exists)
-            return jsonify(playlist_data)
-
-        except Exception as e:
-            print(f"Error updating front end: {e}")
 
     def view_playlist(self):
         """View the playlist."""
@@ -472,12 +594,22 @@ class MusicAgent(Agent):
             if song != songs[-1]:
                 playlist_info += " -- "
         response = playlist_info
-
-        # Send playlist data to the front end
-        self.update_frontend_playlist(songs)
         return response
     
     def functionality(self):
         """What can you do?"""
         response = "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like."
         return response
+    
+
+"""
+R4 : 10 points
+R5 : 6 points
+- Model = 6 points OK
+- Position-based prompts = 3 points TODO
+- Query-based prompts = 3 points TODO
+R6 : 8 points
+- Recommendation = 2 points OK
+- Way to select = 3 points OK (5 TODO if we add natural language processing)
+- Entire playlist = 3 points OK
+"""

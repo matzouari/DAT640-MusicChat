@@ -30,4 +30,51 @@ src="https://cdn.jsdelivr.net/npm/iaigroup-chatwidget@latest/build/bundle.min.js
         <p>&copy; 2024 Music Chat. All rights reserved.</p>
     </footer>
 </body>
+
+<script>
+    async function fetchAndRenderPlaylist() {
+        try {
+            const response = await fetch('/get_playlist'); // Flask API endpoint
+            const data = await response.json();
+
+            const container = document.getElementById('playlist-container');
+            container.innerHTML = ''; // Clear previous content
+
+            if (data.length === 0) {
+                container.innerText = 'Your playlist is empty.';
+                return;
+            }
+
+            // Create a table for the playlist
+            const table = document.createElement('table');
+            table.style.border = "1px solid black";
+            const headerRow = table.insertRow();
+
+            ['Track Name', 'Artist Name', 'Album Name', 'Genre', 'Popularity'].forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                th.style.border = "1px solid black";
+                headerRow.appendChild(th);
+            });
+
+            // Populate the table rows
+            data.forEach(song => {
+                const row = table.insertRow();
+                Object.values(song).forEach(value => {
+                    const cell = row.insertCell();
+                    cell.textContent = value;
+                    cell.style.border = "1px solid black";
+                });
+            });
+
+            container.appendChild(table);
+        } catch (error) {
+            console.error("Error fetching playlist:", error);
+        }
+    }
+
+    // Automatically fetch and render the playlist when the page loads
+    window.onload = fetchAndRenderPlaylist;
+</script>
+
 </html>

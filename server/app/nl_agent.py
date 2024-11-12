@@ -4,6 +4,7 @@ from dialoguekit.core.utterance import Utterance
 from dialoguekit.participant.agent import Agent
 from dialoguekit.participant.participant import DialogueParticipant
 
+from flask import jsonify
 from rapidfuzz import fuzz
 from nltk import ngrams
 
@@ -420,6 +421,30 @@ class MusicAgent(Agent):
         response = "Playlist cleared. All songs removed"
         return response
     
+    def update_frontend_playlist(self, playlist):
+        """Update the front-end dynamically by sending the playlist data."""
+        try:
+            # Assuming `self.db_conn` is being shared with Flask
+            cursor = self.db_conn.cursor(dictionary=True)
+            
+            # Prepare data for the front end
+            playlist_data = [
+                {
+                    "track_name": song["track_name"],
+                    "artist_name": song["artist_name"],
+                    "album_name": song["album_name"],
+                    "genre": song["genre"],
+                    "popularity": song["popularity"],
+                }
+                for song in playlist
+            ]
+
+            # Send data via a Flask API (ensure the endpoint exists)
+            return jsonify(playlist_data)
+
+        except Exception as e:
+            print(f"Error updating front end: {e}")
+
     def view_playlist(self):
         """View the playlist."""
         songs = self.view_playlist_from_db()
@@ -432,6 +457,9 @@ class MusicAgent(Agent):
             if song != songs[-1]:
                 playlist_info += ", "
         response = playlist_info
+
+        # Send playlist data to the front end
+        self.update_frontend_playlist(songs)
         return response
     
     def number_of_songs_in_album(self, user_input):

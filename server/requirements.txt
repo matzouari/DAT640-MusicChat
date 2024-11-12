@@ -1,3 +1,6 @@
 flask==2.2.3
 flask-socketio==5.3.3
 dialoguekit==0.0.9
+rapidfuzz==3.10.1
+nltk==3.9.1
+joblib==1.2.0

@@ -30,6 +30,8 @@ class MusicAgent(Agent):
 
         self.genre_model = joblib.load('app/model/genre_intent_classifier_model.pkl')
         self.genre_vectorizer = joblib.load('app/model/genre_vectorizer.pkl')
+
+        self.question_classifier = joblib.load("app/model/question_classifier_model.pkl")
         
         # Database connection configuration
         db_config = {
@@ -43,6 +45,7 @@ class MusicAgent(Agent):
         self.db_conn = self.connect_to_db(db_config)
         self.tracks_data = self.fetch_all_tracks()
         self.artists_data = self.extract_unique_artists()
+        self.albums_data = self.fetch_all_albums()
         self.top_songs = None 
 
     def connect_to_db(self, db_config):
@@ -81,6 +84,18 @@ class MusicAgent(Agent):
             for artist in artist_names:
                 artists.add(artist.strip().lower())  # Add artist, stripping whitespace and lowercasing
         return list(artists)  # Convert set back to a list for further use
+    
+    def fetch_all_albums(self):
+        """Retrieve all album names from the database."""
+        try:
+            cursor = self.db_conn.cursor(dictionary=True)
+            cursor.execute("SELECT DISTINCT album_name FROM Tracks")
+            albums = [row['album_name'] for row in cursor.fetchall()]
+            cursor.close()
+            return albums
+        except Exception as e:
+            print(f"Database error while fetching albums: {e}")
+            return []
     
     #####################
     ### MODEL METHODS ###
@@ -159,6 +174,12 @@ class MusicAgent(Agent):
                 )
             elif intent == "create":
                 response = self.create_playlist(user_input)
+                utterance = AnnotatedUtterance(
+                    response,
+                    participant=DialogueParticipant.AGENT,
+                )
+            elif intent == "question":
+                response = self.answer_question(user_input)
                 utterance = AnnotatedUtterance(
                     response,
                     participant=DialogueParticipant.AGENT,
@@ -559,6 +580,80 @@ class MusicAgent(Agent):
         except mysql.connector.Error as e:
             print(f"Database error: {e}")
             return "There was an error adding songs to your playlist. Please try again."
+
+    def answer_question(self, question):
+        """Determine the intent of the question and respond accordingly using SVM model classification."""
+        
+        # Step 1: Classify the question intent
+        intent = self.question_classifier.predict([question])[0]
+        
+        # Step 2: Extract relevant entities based on intent and query the database
+        if intent == "count_songs_in_album":
+            album_name = self.extract_entity(question, "album")
+            return self.count_songs_in_album(album_name)
+        
+        elif intent == "count_albums_by_artist":
+            artist_name = self.extract_entity(question, "artist")
+            return self.count_albums_by_artist(artist_name)
+        
+        elif intent == "find_artist_of_song":
+            song_name = self.extract_entity(question, "song")
+            return self.find_artist_of_song(song_name)
+        
+        else:
+            return "I'm sorry, I couldn't understand your question. Could you rephrase it?"
+
+    def extract_entity(self, question, entity_type):
+        """Extracts relevant entities (album, artist, song) based on question type."""
+        if entity_type == "album":
+            match = re.search(r"album (.+)", question, re.IGNORECASE)
+        elif entity_type == "artist":
+            match = re.search(r"artist (.+)", question, re.IGNORECASE)
+        elif entity_type == "song":
+            match = re.search(r"song (.+)", question, re.IGNORECASE)
+        return match.group(1).strip() if match else None
+
+    def count_songs_in_album(self, album_name):
+        """Return the count of songs in the specified album, along with their names."""
+        try:
+            cursor = self.db_conn.cursor()
+            # Get both the count and the list of song names in the album
+            query = "SELECT track_name FROM Tracks WHERE album_name = %s"
+            cursor.execute(query, (album_name,))
+            songs = cursor.fetchall()
+            cursor.close()
+
+            if songs:
+                song_names = [song[0] for song in songs]
+                song_count = len(song_names)
+                song_list = " -- ".join(song_names)
+                return f"The album '{album_name}' contains {song_count} song(s): {song_list}."
+            else:
+                return f"I couldn't find any songs in the album '{album_name}'."
+        except Exception as e:
+            print(f"Database error: {e}")
+            return "There was an error retrieving the album information. Please try again."
+
+    def count_albums_by_artist(self, artist_name):
+        """Return the count of albums by the specified artist, along with their names."""
+        try:
+            cursor = self.db_conn.cursor()
+            # Get both the count and the list of album names by the artist
+            query = "SELECT DISTINCT album_name FROM Tracks WHERE artist_name LIKE %s"
+            cursor.execute(query, (f"%{artist_name}%",))
+            albums = cursor.fetchall()
+            cursor.close()
+
+            if albums:
+                album_names = [album[0] for album in albums]
+                album_count = len(album_names)
+                album_list = " -- ".join(album_names)
+                return f"The artist '{artist_name}' is featured on {album_count} album(s): {album_list}."
+            else:
+                return f"I couldn't find any albums by the artist '{artist_name}'."
+        except Exception as e:
+            print(f"Database error: {e}")
+            return "There was an error retrieving the artist information. Please try again."
     
     def clear_playlist(self):
         """Clear the playlist."""

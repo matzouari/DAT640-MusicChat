@@ -1,0 +1,10 @@
+question,intent
+"How many songs are in album Thriller?",count_songs_in_album
+"Tell me how many songs are in album X",count_songs_in_album
+"Can you count the songs in album Nevermind?",count_songs_in_album
+"How many albums does artist Michael Jackson have?",count_albums_by_artist
+"Tell me how many albums artist X has",count_albums_by_artist
+"What is the total number of albums by artist Madonna?",count_albums_by_artist
+"Which artist wrote song Yesterday?",find_artist_of_song
+"Who wrote the song Bohemian Rhapsody?",find_artist_of_song
+"Can you tell me who wrote song X?",find_artist_of_song

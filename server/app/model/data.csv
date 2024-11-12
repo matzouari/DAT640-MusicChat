@@ -248,6 +248,9 @@ phrase,intent
 "Show",view
 "Display",view
 "View",view
+"View",view
+"View",view
+"View",view
 "Show me my playlist",view
 "I'd like to see my playlist",view
 "Can you display my playlist?",view

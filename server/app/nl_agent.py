@@ -225,10 +225,11 @@ class MusicAgent(Agent):
         
         # Format the response to include the top recommended tracks
         response = "Based on your input, here are the top matching tracks:\n"
-        response += "\n".join(
+        response += " -- ".join(
             f"{i+1}. {track['track_name']} by {track['artist_name']} (Score: {score:.1f}, Popularity: {track['popularity']})"
             for i, (track, score) in enumerate(top_tracks)
         )
+        response += ". To add a song to your playlist, please enter the number corresponding to the song you want to add. If you want to exit, enter 'exit'."
         
         return response
     
@@ -290,7 +291,7 @@ class MusicAgent(Agent):
 
             for genre in top_genres:
                 query = """
-                    SELECT track_name, artist_name, popularity 
+                    SELECT id, track_name, artist_name, popularity 
                     FROM Tracks 
                     WHERE genre LIKE %s AND id NOT IN (
                         SELECT trackID FROM Playlist
@@ -305,11 +306,14 @@ class MusicAgent(Agent):
             # Limit to 15 recommendations if more than 3 genres exist
             recommendations = recommendations[:15]
 
+            self.top_songs = [rec['id'] for rec in recommendations]
+
             # Format recommendations as strings for response
-            recommendation_list = ", ".join(
+            recommendation_list = " -- ".join(
                 f"{i+1}. {rec['track_name']} by {rec['artist_name']} (Popularity: {rec['popularity']})" for i, rec in enumerate(recommendations)
             )
-            response = f"Your playlist is based on the following genres: {', '.join(top_genres)}. Based on your playlist, here are some song recommendations:\n{recommendation_list}"
+            response = f"Your playlist is based on the following genres: {', '.join(top_genres)}. Based on your playlist, here are some song recommendations: {recommendation_list}"
+            response += ". To add a song to your playlist, please enter the number corresponding to the song you want to add. If you want to exit, enter 'exit'."
 
         except mysql.connector.Error as e:
             response = "There was an error fetching recommendations. Please try again."
@@ -345,74 +349,6 @@ class MusicAgent(Agent):
     #########################
     ### CHATBOT RESPONSES ###
     #########################
-
-    def add_songs(self, user_input):
-        # Split the input to see if the artist is mentioned
-        song_name, specified_artist = self.extract_song_name(user_input)
-        tracks = self.fetch_tracks_from_db_by_track_name(song_name)
-
-        if tracks:
-            # If multiple tracks are found and no artist was specified in the input
-            if len(tracks) > 1 and not specified_artist:
-                # Collect the unique artist names for this track
-                possible_tracks = [
-                    f"{track['track_name']} by {track['artist_name']}"
-                    for track in sorted(tracks, key=lambda x: x['popularity'], reverse=True)
-                ]
-
-                # Construct a message listing the artists
-                track_list = ", ".join(possible_tracks)
-                response = f"There are multiple tracks containing '{song_name}'. Possible tracks: {track_list}. Please specify the artist."
-            else:
-                # If artist is provided or only one track matches, filter or use the correct track
-                if specified_artist:
-                    # Filter by specified artist; check if the specified artist matches any in the semicolon-separated list
-                    matching_tracks = []
-                    for track in tracks:
-                        track_artists = [artist.strip().lower() for artist in track['artist_name'].split(';')]
-                        if specified_artist in track_artists:
-                            matching_tracks.append(track)
-
-                    if matching_tracks:  # Proceed if there's a matching track
-                        track_info = matching_tracks[0]  # First match (or modify to let the user choose)
-                        if self.add_track_to_playlist(track_info["id"]):
-                            illusionOfFreeChoice = choice([1,2,3])
-                            if illusionOfFreeChoice == 1:
-                                response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the song, just say 'tell me about song {track_info['track_name']}' or 'what is song {track_info['track_name']} by artist {track_info['artist_name']}'."
-                            elif illusionOfFreeChoice == 2:
-                                response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for the album this song is in, just say 'in which album is song {track_info['track_name']} by {track_info['artist_name']}'."
-                            else:
-                                response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the artist, just say 'show me all songs by {track_info['artist_name']}'."
-                        else:
-                            response = "Track already exists in playlist",
-                    else:
-                        response = f"No track found named '{song_name}' with artist '{specified_artist}'."
-                else:
-                    # If no artist was specified and there's only one match
-                    track_info = tracks[0]
-                    if self.add_track_to_playlist(track_info["id"]):
-                        illusionOfFreeChoice = choice([1,2,3])
-                        if illusionOfFreeChoice == 1:
-                            response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the song, just say 'tell me about song {track_info['track_name']}' or 'what is song {track_info['track_name']} by artist {track_info['artist_name']}'."
-                        elif illusionOfFreeChoice == 2:
-                            response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for the album this song is in, just say 'in which album is song {track_info['track_name']} by {track_info['artist_name']}'."
-                        else:
-                            response = f"Adding {track_info['track_name']} by {track_info['artist_name']} to the playlist. You can ask me for more information about the artist, just say 'show me all songs by {track_info['artist_name']}'."
-                    else:
-                        response = "Track already exists in playlist"
-        else:
-            response = "Track not found in the database."
-        return response
-
-    def remove_songs(self, user_input):
-        """Remove songs from the playlist."""
-        song_name, specified_artist = self.extract_song_name(user_input)
-
-        if self.remove_track_from_playlist_by_name(song_name, specified_artist):
-            response = f"Removed {song_name} from the playlist."
-        else:
-            response = f"Song {song_name} not found in playlist"
-        return response
     
     def clear_playlist(self):
         """Clear the playlist."""
@@ -430,7 +366,7 @@ class MusicAgent(Agent):
         for song in songs:
             playlist_info += f"{song['track_name']} by {song['artist_name']} from the album {song['album_name']}. Genre: {song['genre']}. Popularity: {song['popularity']}"
             if song != songs[-1]:
-                playlist_info += ", "
+                playlist_info += " -- "
         response = playlist_info
         return response
     
@@ -484,7 +420,7 @@ class MusicAgent(Agent):
                 ]
 
                 # Construct a message listing the artists
-                track_list = ", ".join(possible_tracks)
+                track_list = " -- ".join(possible_tracks)
                 response = f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist."
             else:
                 # If artist is provided or only one track matches, filter or use the correct track
@@ -535,7 +471,7 @@ class MusicAgent(Agent):
                 ]
 
                 # Construct a message listing the artists
-                track_list = ", ".join(possible_tracks)
+                track_list = " -- ".join(possible_tracks)
                 response = f"There are multiple tracks containing '{track_name}'. Possible tracks: {track_list}. Please specify the artist."
             else:
                 # If artist is provided or only one track matches, filter or use the correct track

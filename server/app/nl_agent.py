@@ -53,6 +53,10 @@ class MusicAgent(Agent):
             print(f"Database connection error: {err}")
             return None
         
+    ######################
+    ### INITIALIZATION ###
+    ######################
+        
     def fetch_all_tracks(self):
         """Fetch all tracks and their attributes once upon initialization."""
         try:
@@ -74,6 +78,27 @@ class MusicAgent(Agent):
             for artist in artist_names:
                 artists.add(artist.strip().lower())  # Add artist, stripping whitespace and lowercasing
         return list(artists)  # Convert set back to a list for further use
+    
+    #####################
+    ### MODEL METHODS ###
+    #####################
+
+    def preprocess_input(self, text):
+        """Preprocess user input (e.g., lowercasing, removing punctuation)."""
+        return text.lower()
+
+    def interpret_input(self, user_input):
+        """Use the SVM model to interpret the intent from user input."""
+        processed_input = self.preprocess_input(user_input)
+        vectorized_input = self.vectorizer.transform([processed_input])  # Vectorize the input
+        
+        # Make the prediction
+        prediction = self.natural_model.predict(vectorized_input)
+        return prediction
+    
+    #########################
+    ### CHATBOT RESPONSES ###
+    #########################
     
     def welcome(self) -> None:
         """Sends the agent's welcome message."""
@@ -388,34 +413,6 @@ class MusicAgent(Agent):
             cursor.close()
 
         return response
-
-    
-    def functionality(self):
-        """What can you do?"""
-        response = "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like."
-        return response
-        
-    #####################
-    ### MODEL METHODS ###
-    #####################
-
-    def preprocess_input(self, text):
-        """Preprocess user input (e.g., lowercasing, removing punctuation)."""
-        return text.lower()
-
-    def interpret_input(self, user_input):
-        """Use the SVM model to interpret the intent from user input."""
-        processed_input = self.preprocess_input(user_input)
-        vectorized_input = self.vectorizer.transform([processed_input])  # Vectorize the input
-        
-        # Make the prediction
-        prediction = self.natural_model.predict(vectorized_input)
-        return prediction
-
-
-    #########################
-    ### CHATBOT RESPONSES ###
-    #########################
     
     def clear_playlist(self):
         """Clear the playlist."""
@@ -478,4 +475,9 @@ class MusicAgent(Agent):
 
         # Send playlist data to the front end
         self.update_frontend_playlist(songs)
+        return response
+    
+    def functionality(self):
+        """What can you do?"""
+        response = "I'm a virtual assistant that helps you find music. I can add music to your playlist, search for music, and even tell you about the artists and albums you like."
         return response

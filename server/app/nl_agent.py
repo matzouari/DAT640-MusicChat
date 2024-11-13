@@ -326,8 +326,8 @@ class MusicAgent(Agent):
                 results = cursor.fetchall()
                 recommendations.extend(results)
 
-            # Limit to 15 recommendations if more than 3 genres exist
-            recommendations = recommendations[:15]
+            # Limit to 10 recommendations
+            recommendations = recommendations[:10]
 
             self.top_songs = [rec['id'] for rec in recommendations]
 
